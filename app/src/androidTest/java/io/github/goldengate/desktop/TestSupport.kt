@@ -23,7 +23,12 @@ class CleanStateRule(private val keepDemoNotifications: Boolean = false) : Exter
     override fun before() {
         dismissSystemDialogs()
         val ctx: Context = InstrumentationRegistry.getInstrumentation().targetContext
-        File(ctx.applicationInfo.dataDir, "shared_prefs").listFiles()?.forEach { it.delete() }
+        // Deleting the XML files is not enough: Android caches SharedPreferences per process, so a
+        // previous test's state (e.g. its saved window session) would otherwise leak into this one.
+        File(ctx.applicationInfo.dataDir, "shared_prefs").listFiles()?.forEach { file ->
+            ctx.getSharedPreferences(file.name.removeSuffix(".xml"), Context.MODE_PRIVATE).edit().clear().commit()
+            file.delete()
+        }
         ctx.filesDir.listFiles()?.filter { it.name != "screenshots" }?.forEach { it.deleteRecursively() }
         if (!keepDemoNotifications) {
             ctx.getSharedPreferences("system_settings", Context.MODE_PRIVATE).edit()

@@ -19,7 +19,12 @@ typealias DeskRule = AndroidComposeTestRule<ActivityScenarioRule<MainActivity>, 
 class CleanStateRule : ExternalResource() {
     override fun before() {
         val ctx: Context = ApplicationProvider.getApplicationContext()
-        File(ctx.applicationInfo.dataDir, "shared_prefs").listFiles()?.forEach { it.delete() }
+        // Deleting the XML files is not enough: Android caches SharedPreferences per process, so a
+        // previous test's state (e.g. its saved window session) would otherwise leak into this one.
+        File(ctx.applicationInfo.dataDir, "shared_prefs").listFiles()?.forEach { file ->
+            ctx.getSharedPreferences(file.name.removeSuffix(".xml"), Context.MODE_PRIVATE).edit().clear().commit()
+            file.delete()
+        }
         ctx.filesDir.listFiles()?.forEach { it.deleteRecursively() }
         // Robolectric's native AGSL compiler lags the device one, so use the blur-free path here.
         ctx.getSharedPreferences("system_settings", Context.MODE_PRIVATE).edit()
