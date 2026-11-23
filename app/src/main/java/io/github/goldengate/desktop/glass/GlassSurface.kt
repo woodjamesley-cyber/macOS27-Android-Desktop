@@ -56,6 +56,14 @@ val LocalBackdrops = staticCompositionLocalOf<Backdrops?> { null }
 
 enum class GlassSource { Desktop, Wallpaper }
 
+/**
+ * Which backdrop layer the current composable is being recorded into. A glass surface must never
+ * sample a layer that contains itself (that creates a cyclic RenderNode tree and overflows the
+ * RenderThread stack), so surfaces inside the desktop layer fall back to the wallpaper layer and
+ * surfaces inside the wallpaper layer render opaque.
+ */
+val LocalRecordingInto = staticCompositionLocalOf<GlassSource?> { null }
+
 /** Records the content into [layer] and draws it, turning it into a backdrop source. */
 fun Modifier.backdropSource(layer: GraphicsLayer): Modifier = this.drawWithContent {
     layer.record { this@drawWithContent.drawContent() }
@@ -101,7 +109,9 @@ fun GlassSurface(
         glass.quality != GlassQuality.Efficient && GlassShaders.supportsBlur -> GlassQuality.Balanced
         else -> GlassQuality.Efficient
     }
-    val opaque = glass.reduceTransparency || backdrops == null
+    val recordingInto = LocalRecordingInto.current
+    val effectiveSource = if (recordingInto == GlassSource.Desktop) GlassSource.Wallpaper else source
+    val opaque = glass.reduceTransparency || backdrops == null || recordingInto == GlassSource.Wallpaper
 
     val radiusPx = with(density) { cornerRadius.toPx() }
     val blurPx = with(density) { (material.blurDp * (0.75f + tint * 0.6f)).dp.toPx() }
@@ -137,7 +147,7 @@ fun GlassSurface(
             .clip(shape)
     ) {
         if (!opaque) {
-            val layer = when (source) {
+            val layer = when (effectiveSource) {
                 GlassSource.Desktop -> backdrops!!.desktop
                 GlassSource.Wallpaper -> backdrops!!.wallpaper
             }

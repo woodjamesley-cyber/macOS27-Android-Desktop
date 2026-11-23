@@ -59,6 +59,8 @@ import io.github.goldengate.desktop.glass.DeskType
 import io.github.goldengate.desktop.glass.GlassConfig
 import io.github.goldengate.desktop.glass.GlassQuality
 import io.github.goldengate.desktop.glass.LocalBackdrops
+import io.github.goldengate.desktop.glass.LocalRecordingInto
+import io.github.goldengate.desktop.glass.GlassSource
 import io.github.goldengate.desktop.glass.LocalDeskTheme
 import io.github.goldengate.desktop.glass.Tokens
 import io.github.goldengate.desktop.glass.Wallpaper
@@ -166,14 +168,18 @@ private fun Scene(desk: DesktopController, theme: DeskTheme) {
 
             // ---------------- Backdrop: wallpaper + desktop icons + windows
             Box(Modifier.fillMaxSize().backdropSource(desktopLayer)) {
-                Box(Modifier.fillMaxSize().backdropSource(wallpaperLayer)) {
-                    val wp = wallpaper
-                    if (wp != null) Image(wp, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    else Box(Modifier.fillMaxSize().background(Color(0xFF2B2140)))
+                CompositionLocalProvider(LocalRecordingInto provides GlassSource.Desktop) {
+                    Box(Modifier.fillMaxSize().backdropSource(wallpaperLayer)) {
+                        CompositionLocalProvider(LocalRecordingInto provides GlassSource.Wallpaper) {
+                            val wp = wallpaper
+                            if (wp != null) Image(wp, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            else Box(Modifier.fillMaxSize().background(Color(0xFF2B2140)))
+                        }
+                    }
+                    DesktopSurface()
+                    if (mcDim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f * mcDim)).desktopGesturesDismiss(desk).testTag("mission-control"))
+                    WindowsLayer()
                 }
-                DesktopSurface()
-                if (mcDim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f * mcDim)).desktopGesturesDismiss(desk).testTag("mission-control"))
-                WindowsLayer()
             }
 
 
