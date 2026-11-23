@@ -75,6 +75,11 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.isReturnDefaultValues = true
+        // Robolectric UI smoke tests (robo package) are a local debugging aid: run with -Probo.
+        // CI exercises the same flows on a real emulator via the instrumented suite.
+        unitTests.all { test ->
+            if (!project.hasProperty("robo")) test.filter.excludeTestsMatching("*.robo.*")
+        }
     }
     lint {
         abortOnError = false
@@ -103,6 +108,10 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation(composeBom)
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")

@@ -103,10 +103,15 @@ fun Dock(modifier: Modifier = Modifier) {
     val density = LocalDensity.current
     val vertical = s.dockPosition != DockPosition.Bottom
     val items = dockItems(desk)
-    val base = s.dockIconSize.dp
     val gap = 6.dp
     val sepW = 13.dp
     val pad = 7.dp
+    // Shrink tiles so the whole Dock always fits on narrow (phone / portrait) screens.
+    val availDp = with(density) { (if (vertical) desk.rootSizePx.height - Tokens.menuBarHeight.roundToPx() else desk.rootSizePx.width).toDp() }.value - 16f
+    val seps = items.count { it is DockItem.Separator }
+    val tiles = items.size - seps
+    val fitted = if (availDp > 0f && tiles > 0) (availDp - 2 * pad.value - seps * sepW.value - gap.value * (items.size - 1)) / tiles else s.dockIconSize
+    val base = fitted.coerceIn(28f, s.dockIconSize).dp
     val maxScale = if (s.dockMagnification) s.dockMagnifyScale else 1f
 
     // Pointer position along the dock axis (dp from dock start), or null when not hovering.
@@ -236,7 +241,7 @@ fun Dock(modifier: Modifier = Modifier) {
         ) {
             // The glass platter stays at base height; icons magnify out of it (like macOS).
             GlassSurface(
-                Modifier.matchParentSizeAligned(vertical, base + pad * 2, s.dockPosition),
+                Modifier.matchParentSize().matchParentSizeAligned(vertical, base + pad * 2, s.dockPosition),
                 cornerRadius = Tokens.dockRadius, material = GlassMaterial.Clear, elevation = 14.dp,
             )
             if (vertical) Column(

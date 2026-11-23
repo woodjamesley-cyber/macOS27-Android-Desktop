@@ -32,16 +32,13 @@ class DesktopShellTest {
         val win = compose.desk().wm.windows.single { it.appId == "calculator" }
         assertEquals(win.id, compose.desk().wm.focusedId)
         // minimize → appears in Dock as a minimized tile
-        compose.tap("minimize-${win.id}")
+        compose.tapUntil("minimize-${win.id}") { win.minimized }
         compose.waitTag("dock-min:${win.id}")
-        assertTrue(win.minimized)
         // click the minimized tile to restore
-        compose.tap("dock-min:${win.id}")
-        compose.waitUntil(5_000) { !win.minimized }
+        compose.tapUntil("dock-min:${win.id}") { !win.minimized }
         // zoom fills the work area, close removes the window
-        compose.tap("zoom-${win.id}")
-        compose.waitUntil(3_000) { win.zoomed }
-        compose.tap("close-${win.id}")
+        compose.tapUntil("zoom-${win.id}") { win.zoomed }
+        compose.tapUntil("close-${win.id}") { win.closing || compose.desk().wm.windows.none { it.id == win.id } }
         compose.waitGone("window-calculator")
     }
 

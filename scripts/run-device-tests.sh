@@ -7,6 +7,11 @@ OUT=device-output
 mkdir -p "$OUT"
 adb wait-for-device
 adb shell settings put global window_animation_scale 1
+# Silence one-time system UI that would cover the app on a fresh emulator.
+adb shell settings put secure immersive_mode_confirmations confirmed
+adb shell settings put global hide_error_dialogs 1 || true
+sleep 20
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
 adb install -r -g dist/GoldenGateDesktop-debug.apk
 adb install -r -g dist/androidTest.apk
 ARGS=""

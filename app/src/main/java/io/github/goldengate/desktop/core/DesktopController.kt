@@ -112,7 +112,7 @@ class DesktopController(val app: Application, val scope: CoroutineScope) {
     val desktopSelection = mutableStateListOf<String>()
     val recentItems = mutableStateListOf<String>()
     var fileClipboard by mutableStateOf<Pair<List<FsRef>, Boolean>?>(null) // refs, isCut
-    var rootSizePx: Rect = Rect.Zero
+    var rootSizePx: Rect by mutableStateOf(Rect.Zero)
 
     private val prefs = app.getSharedPreferences("desktop_state", Context.MODE_PRIVATE)
 

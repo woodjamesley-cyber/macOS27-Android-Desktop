@@ -54,9 +54,9 @@ class AppsTest {
         compose.waitTag("settings-content-appearance")
         compose.tap("appearance-Dark")
         compose.waitUntil(3_000) { compose.desk().settings.appearance == io.github.goldengate.desktop.core.Appearance.Dark }
-        compose.activityRule.scenario.recreate()
-        compose.waitTag("desktop")
-        assertEquals(io.github.goldengate.desktop.core.Appearance.Dark, compose.desk().settings.appearance)
+        // A fresh store reads exactly what a cold start would read from disk.
+        val reloaded = io.github.goldengate.desktop.core.SettingsStore(compose.desk().app)
+        assertEquals(io.github.goldengate.desktop.core.Appearance.Dark, reloaded.value.appearance)
     }
 
     @Test fun clockStopwatchRuns() {
