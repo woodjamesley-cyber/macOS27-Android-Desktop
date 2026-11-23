@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original emblem: a stylised suspension bridge over a glass window (not an Apple mark). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#40FFFFFF" android:strokeColor="#CCFFFFFF" android:strokeWidth="1.5"
+        android:pathData="M32,34 h44 a8,8 0 0 1 8,8 v28 a8,8 0 0 1 -8,8 h-44 a8,8 0 0 1 -8,-8 v-28 a8,8 0 0 1 8,-8z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M40,72 V44 M68,72 V44 M30,66 Q40,44 54,60 Q68,44 78,66" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5" android:strokeLineCap="round"
+        android:pathData="M28,66 H80" />
+</vector>
