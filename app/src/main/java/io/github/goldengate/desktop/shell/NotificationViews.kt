@@ -72,7 +72,8 @@ import kotlin.math.roundToInt
 fun NotificationBanners(modifier: Modifier = Modifier) {
     val desk = LocalDesktop.current
     val banners = desk.notifications.banners
-    val showing = desk.overlay != Overlay.NotificationCenter
+    // Banners step aside while a top-right panel (Notification Center, Control Center) is open.
+    val showing = desk.overlay != Overlay.NotificationCenter && desk.overlay != Overlay.ControlCenter
     Column(modifier.width(360.dp).padding(top = Tokens.menuBarHeight + 8.dp, end = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (n in banners.toList()) {
             key(n.id) {

@@ -9,6 +9,7 @@ import io.github.goldengate.desktop.core.Overlay
 import io.github.goldengate.desktop.core.SnapZone
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 
@@ -74,6 +75,16 @@ class ScreenshotTour {
         closeAll()
         open("browser")
         compose.screenshot("14-browser")
+        // A real page rendered by the system WebView (local file, so no network is needed).
+        val page = File(compose.desk().fs.home, "Documents/hello.html").apply {
+            writeText("<html><body style='font-family:sans-serif;padding:24px;background:linear-gradient(#fdf6e3,#e8d8ff)'>" +
+                "<h1>Hello from WebView</h1><p>This page is rendered by Android System WebView inside a desktop window.</p>" +
+                "<ul><li>Back / forward history</li><li>Tabs</li><li>Downloads handed to Android</li></ul></body></html>")
+        }
+        closeAll()
+        open("browser", "url:file://" + page.absolutePath)
+        Thread.sleep(3_000)
+        compose.screenshot("14b-browser-page")
         closeAll()
         open("sysinfo")
         compose.screenshot("15-system-information")

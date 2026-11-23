@@ -232,7 +232,8 @@ fun BrowserApp(win: DeskWindow) {
             }
             Box(Modifier.fillMaxSize()) {
                 tabs.forEachIndexed { i, t ->
-                    if (i == active) {
+                    // The WebView is only created once the tab has a page, so the start page is pure Compose.
+                    if (i == active && t.url.isNotEmpty()) {
                         androidx.compose.runtime.key(t.id) {
                             AndroidView(
                                 factory = { ctx ->
@@ -247,7 +248,9 @@ fun BrowserApp(win: DeskWindow) {
                                 modifier = Modifier.fillMaxSize().testTag("browser-webview"),
                             )
                         }
-                        if (t.url.isEmpty()) StartPage { load(t, it) }
+                    }
+                    if (i == active && t.url.isEmpty()) {
+                        StartPage { load(t, it) }
                     }
                 }
             }
