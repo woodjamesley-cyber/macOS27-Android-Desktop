@@ -50,5 +50,9 @@ platform blocks direct control, the app uses the closest legitimate alternative.
   machine, terminal shell (including sandbox escapes), and URL normalization.
 * Instrumented Compose/UiAutomator tests run on an API 34 emulator in CI (tablet profile: full
   suite; phone profile: screenshot tour) and include a smoke test of the minified release APK.
+* The CI emulators use a software GPU (SwiftShader), so the refraction shader's exact look on
+  real GPUs is verified only by the rendering code path, not by pixel comparison.
+* Robolectric versions of the UI tests exist for fast local debugging (`./gradlew testDebugUnitTest -Probo`)
+  but are not part of CI, because Robolectric's environment makes some of them flaky.
 * Not tested automatically: physical game controllers, physical mice/keyboards, foldable hinge
   postures, Android 8–11 fallback rendering on real hardware.

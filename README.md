@@ -12,7 +12,23 @@ GPU-accelerated glass (live blur, vibrancy and an AGSL refraction shader).
 
 **[Download the latest APK](https://github.com/woodjamesley-cyber/macOS27-Android-Desktop/releases/latest/download/GoldenGateDesktop.apk)** · [All releases](https://github.com/woodjamesley-cyber/macOS27-Android-Desktop/releases) · [CI builds](https://github.com/woodjamesley-cyber/macOS27-Android-Desktop/actions)
 
-<!-- SCREENSHOTS -->
+## Screenshots
+
+Captured automatically by the CI screenshot tour on API 34 emulators (Pixel C tablet and Pixel 6 phone, software GPU). Glass effects may look slightly different on devices with a hardware GPU.
+
+<table>
+<tr><td width="50%"><img src="docs/screenshots/tablet-01-desktop-banners.jpg" alt="Desktop, glass menu bar, Dock and notification banners"><br><sub>Desktop, glass menu bar, Dock and notification banners</sub></td><td width="50%"><img src="docs/screenshots/tablet-02-finder-notes-snapped.jpg" alt="Finder and Notes snapped side by side"><br><sub>Finder and Notes snapped side by side</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tablet-03-control-center.jpg" alt="Control Center"><br><sub>Control Center</sub></td><td width="50%"><img src="docs/screenshots/tablet-04-notification-center.jpg" alt="Notification Center with widgets"><br><sub>Notification Center with widgets</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tablet-05-system-menu.jpg" alt="System menu"><br><sub>System menu</sub></td><td width="50%"><img src="docs/screenshots/tablet-06-mission-control.jpg" alt="Mission Control with Spaces"><br><sub>Mission Control with Spaces</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tablet-07-terminal-calculator.jpg" alt="Terminal running sandboxed commands"><br><sub>Terminal running sandboxed commands</sub></td><td width="50%"><img src="docs/screenshots/tablet-09-settings-dark.jpg" alt="System Settings in Dark appearance"><br><sub>System Settings in Dark appearance</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tablet-10-photos.jpg" alt="Photos"><br><sub>Photos</sub></td><td width="50%"><img src="docs/screenshots/tablet-11-music.jpg" alt="Music"><br><sub>Music</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tablet-12-calendar.jpg" alt="Calendar"><br><sub>Calendar</sub></td><td width="50%"><img src="docs/screenshots/tablet-14b-browser-page.jpg" alt="Browser rendering a page with System WebView"><br><sub>Browser rendering a page with System WebView</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tablet-16-launcher.jpg" alt="App launcher"><br><sub>App launcher</sub></td><td width="50%"><img src="docs/screenshots/tablet-17-spotlight-calc.jpg" alt="Spotlight with inline calculation"><br><sub>Spotlight with inline calculation</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/tablet-18-light-tinted-glass.jpg" alt="Light appearance with tinted glass"><br><sub>Light appearance with tinted glass</sub></td></tr>
+</table>
+
+<table><tr><td><img src="docs/screenshots/phone-01-desktop-banners.jpg" width="220" alt="Phone: desktop"><br><sub>Phone: desktop</sub></td><td><img src="docs/screenshots/phone-06-mission-control.jpg" width="220" alt="Phone: Mission Control"><br><sub>Phone: Mission Control</sub></td><td><img src="docs/screenshots/phone-16-launcher.jpg" width="220" alt="Phone: launcher"><br><sub>Phone: launcher</sub></td></tr></table>
+
 
 ## Install
 
