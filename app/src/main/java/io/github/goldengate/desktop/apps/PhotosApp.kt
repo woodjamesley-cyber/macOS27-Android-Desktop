@@ -68,6 +68,8 @@ import io.github.goldengate.desktop.ui.desktopGestures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -91,13 +93,18 @@ fun PhotosApp(win: DeskWindow) {
     LaunchedEffect(Unit) {
         if (!prefs.getBoolean("seeded", false)) {
             seeding = true
-            withContext(Dispatchers.Default) {
-                val dir = File(fs.pictures, "Samples").apply { mkdirs() }
+            // Rendered in parallel and published one by one so the grid fills in progressively.
+            val dir = File(fs.pictures, "Samples").apply { mkdirs() }
+            coroutineScope {
                 Wallpaper.entries.forEachIndexed { i, w ->
-                    for (dark in listOf(false, true)) {
-                        val bmp = WallpaperPainter.paint(w, dark, 1200, 800, seed = i * 13 + if (dark) 5 else 1)
-                        File(dir, "${w.label}${if (dark) " Night" else ""}.jpg").outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+                    for (dark in listOf(false, true)) launch(Dispatchers.Default) {
+                        val bmp = WallpaperPainter.paint(w, dark, 960, 640, seed = i * 13 + if (dark) 5 else 1)
+                        val name = "${w.label}${if (dark) " Night" else ""}.jpg"
+                        val tmp = File(dir, ".$name.part")
+                        tmp.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 86, it) }
+                        tmp.renameTo(File(dir, name))
                         bmp.recycle()
+                        withContext(Dispatchers.Main) { desk.refreshFs() }
                     }
                 }
             }

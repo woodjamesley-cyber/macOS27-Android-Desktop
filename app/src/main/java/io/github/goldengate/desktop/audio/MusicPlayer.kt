@@ -49,7 +49,10 @@ class MusicPlayer(private val context: Context, private val scope: CoroutineScop
                     preparingLibrary = true
                     Synth.writeWav(f, Synth.render(t))
                 }
-                songs += Song("gen$i", t.title, t.artist, t.album, Uri.fromFile(f), true, (i * 67f) % 360f)
+                val song = Song("gen$i", t.title, t.artist, t.album, Uri.fromFile(f), true, (i * 67f) % 360f)
+                songs += song
+                // Publish each track as soon as it exists so the library fills in progressively.
+                withContext(Dispatchers.Main) { if (library.none { it.id == song.id }) library.add(song) }
             }
             musicDir.listFiles()?.filter { it.isFile && it.extension.lowercase() in setOf("mp3", "m4a", "ogg", "flac", "aac") }?.forEach { f ->
                 songs += Song("file:" + f.name, f.nameWithoutExtension, "Imported", "My Music", Uri.fromFile(f), false, (f.name.hashCode() % 360).toFloat())

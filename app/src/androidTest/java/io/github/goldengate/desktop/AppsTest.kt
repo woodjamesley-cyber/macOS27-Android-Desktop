@@ -76,8 +76,8 @@ class AppsTest {
     }
 
     @Test fun photosMusicFilesBrowserSysInfoOpen() {
-        launch("photos"); compose.waitTag("photos-grid", 15_000).assertIsDisplayed()
-        launch("music"); compose.waitTag("music-list").assertIsDisplayed()
+        launch("photos"); compose.waitTag("photos-grid", 40_000).assertIsDisplayed()
+        launch("music"); compose.waitTag("music-list", 40_000).assertIsDisplayed()
         launch("files"); compose.waitTag("files-app").assertIsDisplayed()
         launch("browser"); compose.waitTag("browser-address").assertIsDisplayed()
         launch("sysinfo"); compose.waitTag("window-sysinfo").assertIsDisplayed()

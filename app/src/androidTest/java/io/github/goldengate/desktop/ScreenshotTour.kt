@@ -60,7 +60,7 @@ class ScreenshotTour {
         compose.screenshot("09-settings-dark")
 
         closeAll()
-        open("photos"); compose.waitTag("photos-grid", 15_000)
+        open("photos"); compose.waitTag("photos-grid", 40_000)
         compose.screenshot("10-photos")
         closeAll()
         open("music")

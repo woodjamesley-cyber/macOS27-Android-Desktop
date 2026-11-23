@@ -77,5 +77,11 @@ fun DeskRule.tapUntil(tag: String, timeout: Long = 4_000, done: () -> Boolean) {
         tap(tag)
         try { waitUntil(timeout) { done() }; return } catch (_: androidx.compose.ui.test.ComposeTimeoutException) {}
     }
-    waitUntil(timeout) { done() }
+    screenshot("fail-${tag.replace(':', '_')}")
+    val d = desk()
+    throw AssertionError(
+        "tapUntil($tag) never satisfied; windows=" + d.wm.windows.map { "${it.id}:${it.appId} min=${it.minimized} zoom=${it.zoomed} closing=${it.closing}" } +
+            " focused=${d.wm.focusedId} overlay=${d.overlay} menu=${d.openMenu} node=" +
+            runCatching { onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot }.getOrNull()
+    )
 }
