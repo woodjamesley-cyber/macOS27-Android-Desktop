@@ -9,6 +9,16 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <!-- Android 12+: requested at runtime only when the user opens Bluetooth in Control Center. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- App Store: hand retained APKs to Android's package installer (the user still confirms). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- The App Store checks which catalog apps are installed without seeing the rest of the device. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
@@ -38,6 +48,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Optional Home app: the desktop can replace One UI Home as the launcher. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <meta-data android:name="WindowManagerPreference:FreeformWindowSize" android:value="maximize" />
         </activity>

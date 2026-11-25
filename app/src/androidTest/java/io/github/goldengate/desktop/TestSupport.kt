@@ -30,11 +30,14 @@ class CleanStateRule(private val keepDemoNotifications: Boolean = false) : Exter
             file.delete()
         }
         ctx.filesDir.listFiles()?.filter { it.name != "screenshots" }?.forEach { it.deleteRecursively() }
+        // These tests exercise the desktop itself, so skip the first-run Setup Assistant.
         if (!keepDemoNotifications) {
             ctx.getSharedPreferences("system_settings", Context.MODE_PRIVATE).edit()
-                .putBoolean("demoNotifications", false).putBoolean("uiSounds", false).commit()
+                .putBoolean("demoNotifications", false).putBoolean("uiSounds", false)
+                .putBoolean("setupComplete", true).commit()
         } else {
-            ctx.getSharedPreferences("system_settings", Context.MODE_PRIVATE).edit().putBoolean("uiSounds", false).commit()
+            ctx.getSharedPreferences("system_settings", Context.MODE_PRIVATE).edit()
+                .putBoolean("uiSounds", false).putBoolean("setupComplete", true).commit()
         }
     }
 }

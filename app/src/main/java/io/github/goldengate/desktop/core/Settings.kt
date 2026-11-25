@@ -21,6 +21,7 @@ object AppIds {
     const val MUSIC = "music"
     const val SYSINFO = "sysinfo"
     const val HELP = "help"
+    const val STORE = "store"
     // Pseudo items shown in the Dock
     const val LAUNCHER = "launcher"
     const val MISSION = "mission"
@@ -28,7 +29,7 @@ object AppIds {
     const val TRASH_FULL = "trash_full"
     const val SYSTEM = "system"
 
-    val defaultDock = listOf(FINDER, LAUNCHER, BROWSER, NOTES, CALENDAR, PHOTOS, MUSIC, TERMINAL, CALCULATOR, CLOCK, FILES, SETTINGS)
+    val defaultDock = listOf(FINDER, LAUNCHER, STORE, BROWSER, NOTES, CALENDAR, PHOTOS, MUSIC, TERMINAL, CALCULATOR, CLOCK, FILES, SETTINGS)
 }
 
 enum class Appearance { Light, Dark, Auto }
@@ -79,6 +80,10 @@ data class SystemSettings(
     val computerName: String = "Android Desktop",
     val demoNotifications: Boolean = true,
     val spaces: Int = 2,
+    /** False until the Setup Assistant has been completed (or skipped). */
+    val setupComplete: Boolean = false,
+    /** Optional 4–8 digit lock screen passcode; blank means unlock with a tap. */
+    val lockPin: String = "",
 )
 
 class SettingsStore(context: Context) {
@@ -145,6 +150,8 @@ class SettingsStore(context: Context) {
             computerName = p.getString("computerName", d.computerName) ?: d.computerName,
             demoNotifications = p.getBoolean("demoNotifications", d.demoNotifications),
             spaces = p.getInt("spaces", d.spaces).coerceIn(1, 6),
+            setupComplete = p.getBoolean("setupComplete", d.setupComplete),
+            lockPin = p.getString("lockPin", d.lockPin)?.filter { it.isDigit() }?.take(8) ?: "",
         )
     }
 
@@ -191,6 +198,8 @@ class SettingsStore(context: Context) {
             putString("computerName", s.computerName)
             putBoolean("demoNotifications", s.demoNotifications)
             putInt("spaces", s.spaces)
+            putBoolean("setupComplete", s.setupComplete)
+            putString("lockPin", s.lockPin)
         }.apply()
     }
 

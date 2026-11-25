@@ -22,6 +22,7 @@ fun systemMenu(desk: DesktopController): MenuDef = MenuDef("", glyph = Glyph.Emb
     item("About This Device") { desk.launch(AppIds.SYSINFO) }
     separator()
     item("System Settings…", Shortcut(Key.Comma, alt = true)) { desk.launch(AppIds.SETTINGS) }
+    item("App Store…") { desk.launch(AppIds.STORE) }
     separator()
     submenu("Recent Items") {
         if (desk.recentItems.isEmpty()) item("No Recent Items", enabled = false) {}

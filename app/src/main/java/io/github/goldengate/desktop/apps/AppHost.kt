@@ -29,6 +29,7 @@ fun AppContent(win: DeskWindow) {
         AppIds.MUSIC -> MusicApp(win)
         AppIds.SYSINFO -> SysInfoApp(win)
         AppIds.HELP -> TipsApp(win)
+        AppIds.STORE -> AppStoreApp(win)
     }
 }
 

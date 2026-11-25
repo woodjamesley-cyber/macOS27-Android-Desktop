@@ -13,11 +13,13 @@ platform blocks direct control, the app uses the closest legitimate alternative.
 | Volume slider | Controls the real media volume | — |
 | Night Shift | A warm color overlay drawn over the desktop | No public API for the system night-light |
 | Focus / Do Not Disturb | Silences this app's banners only (history still kept) | System DND needs notification-policy access |
-| Lock / Sleep / Restart / Shut Down | In-app lock screen, dimmed "sleep" screen, restart = reload desktop, shut down = quit app | Apps can't power-manage the device |
+| Lock / Sleep / Restart / Shut Down | In-app Liquid Glass lock screen (optional passcode), dimmed "sleep" screen, restart = reload desktop, shut down = quit app | Apps can't power-manage the device |
+| App Store / Google Play | Installed apps open directly; others open their real Google Play listing. APKs you pick are copied into the app's private App Library and handed to Android's package installer | Android forbids one app silently installing another; the user always confirms |
+| Default Home app | The desktop declares a HOME activity, so it can be chosen as the launcher (Settings ▸ General ▸ Home App, or the Setup Assistant). Android shows its own confirmation and One UI Home can be restored in Android Settings | Only the user/OS can change the default Home app |
 | Files | Private sandbox "home" folder plus any folders you grant through the Storage Access Framework | Scoped storage; we never request broad storage permission |
 | Browser | Android `WebView` with tabs, back/forward, zoom and a start page; downloads are handed to Android | Not Safari/WebKit; no extensions |
 | Trackpad gestures | Three/four-finger gestures are not available; use the Dock, hot keys, or controller buttons | Android doesn't deliver them to apps |
-| Display | Runs full-screen inside one Android activity; it does not replace the Android launcher | — |
+| Display | Runs full-screen inside one Android activity; it can be set as the Home app but does not replace Android's system UI | — |
 
 ## Rendering
 

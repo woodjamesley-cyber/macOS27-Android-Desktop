@@ -28,6 +28,7 @@ object AppRegistry {
         AppSpec(AppIds.MUSIC, "Music", 860f, 560f, 560f, 380f, singleWindow = true, category = "Entertainment", keywords = listOf("songs", "audio", "player")),
         AppSpec(AppIds.SYSINFO, "System Information", 640f, 500f, 480f, 360f, singleWindow = true, category = "System", keywords = listOf("about", "device", "hardware", "cpu", "gpu")),
         AppSpec(AppIds.HELP, "Tips", 560f, 520f, 420f, 360f, singleWindow = true, category = "System", keywords = listOf("help", "shortcuts", "guide")),
+        AppSpec(AppIds.STORE, "App Store", 900f, 620f, 520f, 380f, singleWindow = true, category = "System", keywords = listOf("apps", "appstore", "install", "apk", "store", "play", "download")),
     )
 
     private val byId = apps.associateBy { it.id }

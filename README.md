@@ -54,7 +54,13 @@ multiple Spaces (desktops).
 
 **Dock** — magnification, bounce-on-launch, running indicators, separators, recent apps,
 minimized windows, Trash; add/remove/rearrange apps (drag or context menu); bottom/left/right
-positions, auto-hide, adjustable size.
+positions, auto-hide, adjustable size. Drag the Dock's inner edge to resize it in **any** position
+(side Docks scroll when they no longer fit).
+
+**Setup Assistant & lock screen** — a Liquid Glass first-run assistant chooses appearance, accent,
+Dock position, account name, passcode and Home app. The lock screen blurs the desktop behind
+full-screen glass, shows the clock and account, and accepts an optional 4–8 digit passcode
+(on-screen keypad or hardware keyboard).
 
 **Menu bar** — system menu (About, Settings, Recent Items, Force Quit, Sleep, Lock, Restart, Shut
 Down) and per-app File / Edit / View / Window / Help menus that execute real actions with
@@ -71,7 +77,7 @@ with genie-style animation, zoom), edge snapping to halves/quarters/fill, tiling
 Control, ⌘/Ctrl+Tab app switcher, move windows between Spaces; window positions persist across
 rotation and app restarts.
 
-**Apps (13)**
+**Apps (14)**
 
 | App | What it does |
 |---|---|
@@ -88,9 +94,11 @@ rotation and app restarts.
 | Music | Original generative tracks + your imported audio; library, shuffle/repeat, seek, volume |
 | System Information | Device hardware, GPU, memory, storage, software and input devices |
 | Tips | Built-in guide and shortcut reference |
+| App Store | Curated catalog of real Android apps; opens installed apps, hands others to Google Play, imports APKs into a private App Library and installs them with Android's package installer |
 
-Also: Spotlight search (apps, files, settings, inline math), a full-screen app launcher, a lock
-screen, volume/brightness HUDs, subtle synthesized UI sounds (toggle in Settings → Sound).
+Also: Spotlight search (apps, files, settings, inline math), a full-screen app launcher, volume and
+brightness HUDs, subtle synthesized UI sounds (toggle in Settings → Sound), and an optional
+**default Home app** mode so the desktop can replace One UI Home as the launcher.
 
 **Input that adapts automatically** — touch (long-press = right-click), mouse (hover, right-click,
 scroll), physical keyboard (⌘/Ctrl shortcuts) and game controllers (on-screen pointer, buttons

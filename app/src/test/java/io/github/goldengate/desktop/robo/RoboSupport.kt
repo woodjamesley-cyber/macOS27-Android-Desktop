@@ -27,8 +27,10 @@ class CleanStateRule : ExternalResource() {
         }
         ctx.filesDir.listFiles()?.forEach { it.deleteRecursively() }
         // Robolectric's native AGSL compiler lags the device one, so use the blur-free path here.
+        // These tests exercise the desktop itself, so skip the first-run Setup Assistant.
         ctx.getSharedPreferences("system_settings", Context.MODE_PRIVATE).edit()
-            .putBoolean("demoNotifications", false).putBoolean("uiSounds", false).commit()
+            .putBoolean("demoNotifications", false).putBoolean("uiSounds", false)
+            .putBoolean("setupComplete", true).commit()
     }
 }
 

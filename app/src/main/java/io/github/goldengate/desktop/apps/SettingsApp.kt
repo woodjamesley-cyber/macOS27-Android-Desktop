@@ -47,6 +47,7 @@ import io.github.goldengate.desktop.core.DesktopController
 import io.github.goldengate.desktop.core.DialogSpec
 import io.github.goldengate.desktop.core.DockPosition
 import io.github.goldengate.desktop.core.MinimizeEffect
+import io.github.goldengate.desktop.core.Overlay
 import io.github.goldengate.desktop.core.SystemPanel
 import io.github.goldengate.desktop.core.SystemSettings
 import io.github.goldengate.desktop.fs.FileSystem
@@ -193,6 +194,18 @@ private fun SliderRow(label: String, value: Float, range: ClosedFloatingPointRan
 @Composable
 private fun GeneralPane(desk: DesktopController) {
     val s = desk.settings
+    var isDefaultHome by remember { mutableStateOf(desk.bridge?.isDefaultLauncher() == true) }
+    fun passcodeDialog() {
+        desk.dialog = DialogSpec(
+            "Set a lock screen passcode",
+            "Choose 4–8 digits. The lock screen asks for them before unlocking.",
+            input = "", confirm = "Set Passcode", glyph = Glyph.Lock,
+        ) { raw ->
+            val digits = raw.filter { it.isDigit() }.take(8)
+            if (digits.length < 4) desk.error("A passcode needs at least 4 digits.")
+            else desk.set { it.copy(lockPin = digits) }
+        }
+    }
     FormSection("Identity") {
         FormRow("Your name") { DeskTextField(s.userName, { v -> desk.set { it.copy(userName = v.take(32)) } }, Modifier.width(200.dp)) }
         FormRow("Computer name", divider = false) { DeskTextField(s.computerName, { v -> desk.set { it.copy(computerName = v.take(40)) } }, Modifier.width(200.dp)) }
@@ -204,6 +217,34 @@ private fun GeneralPane(desk: DesktopController) {
     FormSection("Date & Time") {
         Toggle("24-hour time", s.clock24h) { v -> desk.set { it.copy(clock24h = v) } }
         Toggle("Show seconds in the menu bar", s.showSeconds, divider = false) { v -> desk.set { it.copy(showSeconds = v) } }
+    }
+    FormSection("Lock Screen", footer = "The passcode is stored on this device and guards the desktop's own lock screen. It is not Android's device lock.") {
+        Toggle("Require passcode", s.lockPin.isNotEmpty(), divider = s.lockPin.isNotEmpty()) { on ->
+            if (on) passcodeDialog() else desk.set { it.copy(lockPin = "") }
+        }
+        if (s.lockPin.isNotEmpty()) {
+            FormRow("Passcode", detail = "${s.lockPin.length} digits") { PushButton("Change…", { passcodeDialog() }) }
+        }
+        FormRow("Lock now", divider = false) {
+            PushButton("Lock Screen", { desk.overlay = Overlay.Locked }, glyph = Glyph.Lock)
+        }
+    }
+    FormSection("Home App", footer = "Android decides which Home app starts with the Home button. Choosing Golden Gate Desktop replaces One UI Home; switch back any time in Android Settings ▸ Apps ▸ Default apps ▸ Home app.") {
+        FormRow("Default Home app", detail = if (isDefaultHome) "Golden Gate Desktop" else "One UI Home or another launcher") {
+            PushButton(
+                if (isDefaultHome) "Change…" else "Set as Default…",
+                {
+                    desk.bridge?.requestDefaultLauncher { granted ->
+                        isDefaultHome = granted || desk.bridge?.isDefaultLauncher() == true
+                    }
+                },
+                primary = !isDefaultHome, glyph = Glyph.House,
+            )
+        }
+        FormRow("Android Home settings", divider = false) { PushButton("Open…", { desk.bridge?.openHomeSettings() }) }
+    }
+    FormSection("Setup Assistant", footer = "Reopens the first-run guide to change appearance, account, passcode and Home app.") {
+        FormRow("Setup Assistant", divider = false) { PushButton("Open…", { desk.showSetupAssistant = true }) }
     }
     FormSection("Restart", footer = "Resetting restores every setting to its default. Your files are kept.") {
         FormRow("Restart Desktop", detail = "Closes all windows and rebuilds the desktop.") { PushButton("Restart…", { desk.restartDesktop() }) }

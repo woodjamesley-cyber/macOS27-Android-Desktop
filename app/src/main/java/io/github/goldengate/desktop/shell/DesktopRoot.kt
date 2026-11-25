@@ -232,6 +232,7 @@ private fun Scene(desk: DesktopController, theme: DeskTheme) {
             // Night Shift: a warm multiply-like overlay (approximation; Android apps can't change display color temperature).
             if (s.nightShift) Box(Modifier.fillMaxSize().background(Color(0xFFFF9A3C).copy(alpha = 0.10f + 0.16f * s.nightShiftWarmth)))
 
+            if (!s.setupComplete || desk.showSetupAssistant) SetupAssistant()
             if (ov == Overlay.Locked) LockScreen()
             if (ov == Overlay.Sleep) SleepScreen()
 

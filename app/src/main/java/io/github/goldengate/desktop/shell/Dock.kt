@@ -7,6 +7,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -22,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -111,8 +118,14 @@ fun Dock(modifier: Modifier = Modifier) {
     val seps = items.count { it is DockItem.Separator }
     val tiles = items.size - seps
     val fitted = if (availDp > 0f && tiles > 0) (availDp - 2 * pad.value - seps * sepW.value - gap.value * (items.size - 1)) / tiles else s.dockIconSize
-    val base = fitted.coerceIn(28f, s.dockIconSize).dp
+    // Bottom Docks shrink to fit the screen width; side Docks keep the size the user picked and
+    // scroll instead, so the left/right Dock is just as resizable as the bottom one.
+    val base = if (vertical) s.dockIconSize.dp else fitted.coerceIn(28f, s.dockIconSize).dp
     val maxScale = if (s.dockMagnification) s.dockMagnifyScale else 1f
+    val dockScroll = rememberScrollState()
+    val neededDp = base.value * tiles + sepW.value * seps + gap.value * (items.size - 1).coerceAtLeast(0) + 2 * pad.value
+    // Only scroll when the chosen size really doesn't fit; scrolling clips magnification otherwise.
+    val scrollable = vertical && availDp > 0f && neededDp > availDp
 
     // Pointer position along the dock axis (dp from dock start), or null when not hovering.
     var pointer by remember { mutableStateOf<Float?>(null) }
@@ -122,6 +135,8 @@ fun Dock(modifier: Modifier = Modifier) {
     var dragCross by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(s.dockAutoHide) { revealed = !s.dockAutoHide }
+    // Scrolling a side Dock shouldn't leave a stale magnification focus.
+    LaunchedEffect(dockScroll.value) { if (vertical) pointer = null }
     LaunchedEffect(pointer, s.dockAutoHide, desk.openMenu) {
         if (s.dockAutoHide && pointer == null && desk.openMenu == null) { delay(900); revealed = false }
     }
@@ -137,8 +152,9 @@ fun Dock(modifier: Modifier = Modifier) {
         }
     }
     val range = base.value * 3.2f
+    val scrollDp = if (vertical) with(density) { dockScroll.value.toDp().value } else 0f
     fun scaleFor(i: Int): Float {
-        val p = pointer ?: return 1f
+        val p = (pointer ?: return 1f) + scrollDp
         if (items[i] is DockItem.Separator) return 1f
         val d = abs(p - centers[i])
         if (d > range) return 1f
@@ -245,7 +261,8 @@ fun Dock(modifier: Modifier = Modifier) {
                 cornerRadius = Tokens.dockRadius, material = GlassMaterial.Clear, elevation = 14.dp,
             )
             if (vertical) Column(
-                Modifier.padding(vertical = pad).padding(horizontal = pad),
+                Modifier.fillMaxHeight().then(if (scrollable) Modifier.verticalScroll(dockScroll) else Modifier)
+                    .padding(vertical = pad).padding(horizontal = pad),
                 verticalArrangement = Arrangement.spacedBy(gap),
                 horizontalAlignment = if (s.dockPosition == DockPosition.Left) Alignment.Start else Alignment.End,
             ) { bar() }
@@ -254,7 +271,49 @@ fun Dock(modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalAlignment = Alignment.Bottom,
             ) { bar() }
+            DockResizeGrip(desk, vertical, s.dockPosition)
         }
+    }
+}
+
+/**
+ * Drag the Dock's inner edge to resize it. Works for the bottom, left and right Dock;
+ * the size is persisted in Settings ▸ Desktop & Dock.
+ */
+@Composable
+private fun BoxScope.DockResizeGrip(desk: DesktopController, vertical: Boolean, pos: DockPosition) {
+    val density = LocalDensity.current
+    val src = remember { MutableInteractionSource() }
+    val hovered by src.collectIsHoveredAsState()
+    Box(
+        Modifier
+            .align(
+                if (vertical) (if (pos == DockPosition.Left) Alignment.CenterEnd else Alignment.CenterStart)
+                else Alignment.TopCenter,
+            )
+            .then(if (vertical) Modifier.fillMaxHeight().width(8.dp) else Modifier.fillMaxWidth().height(8.dp))
+            .hoverable(src)
+            .pointerHoverIcon(PointerIcon(if (vertical) android.view.PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW else android.view.PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW))
+            .pointerInput(pos) {
+                detectDragGestures { change, drag ->
+                    change.consume()
+                    val delta = when (pos) {
+                        DockPosition.Bottom -> -drag.y
+                        DockPosition.Left -> drag.x
+                        DockPosition.Right -> -drag.x
+                    } / density.density
+                    desk.updateSettings { st -> st.copy(dockIconSize = (st.dockIconSize + delta).coerceIn(32f, 84f)) }
+                }
+            }
+            .semantics { contentDescription = "Resize Dock" }
+            .testTag("dock-resize"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = if (hovered) 0.65f else 0.16f))
+                .then(if (vertical) Modifier.width(2.5.dp).height(38.dp) else Modifier.height(2.5.dp).width(38.dp)),
+        )
     }
 }
 

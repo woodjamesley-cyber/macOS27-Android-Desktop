@@ -42,6 +42,20 @@ interface PlatformBridge {
     fun requestBluetoothPermission(onResult: (Boolean) -> Unit)
     fun quitApp()
     fun toastFallback(text: String)
+
+    // ---------------- App Store & Home app ----------------
+    /** Picks an .apk file (the store copies it into its private library before installing). */
+    fun pickApk(onResult: (Uri?) -> Unit)
+    fun isPackageInstalled(packageName: String): Boolean
+    fun launchPackage(packageName: String): Boolean
+    fun openStoreListing(packageName: String)
+    /** Installs a retained APK through Android's package installer. Returns false if it couldn't start. */
+    fun installApk(file: File): Boolean
+    fun openAppSettings(packageName: String)
+    fun isDefaultLauncher(): Boolean
+    /** Opens Android's "Home app" chooser (or its Settings page) and reports whether we became Home. */
+    fun requestDefaultLauncher(onResult: (Boolean) -> Unit)
+    fun openHomeSettings()
 }
 
 enum class SystemPanel { Wifi, Bluetooth, Internet, Volume, Display, Cast, AppDetails, Nfc }
@@ -97,6 +111,8 @@ class DesktopController(val app: Application, val scope: CoroutineScope) {
     var bridge: PlatformBridge? = null
 
     var overlay by mutableStateOf<Overlay>(Overlay.None)
+    /** Re-opens the Setup Assistant from System Settings even after setup is complete. */
+    var showSetupAssistant by mutableStateOf(false)
     var openMenu by mutableStateOf<OpenMenu?>(null)
     var dialog by mutableStateOf<DialogSpec?>(null)
     var hud by mutableStateOf<Hud?>(null)

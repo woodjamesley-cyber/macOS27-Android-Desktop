@@ -101,6 +101,7 @@ private fun iconColors(appId: String, dark: Boolean): Pair<Color, Color> = when 
     AppIds.MISSION -> Color(0xFF7A86A8) to Color(0xFF353C55)
     AppIds.TRASH, AppIds.TRASH_FULL -> Color(0x00FFFFFF) to Color(0x00FFFFFF)
     AppIds.HELP -> Color(0xFFFFE27A) to Color(0xFFFFA928)
+    AppIds.STORE -> Color(0xFF3E8BFF) to Color(0xFF1338B8)
     else -> Color(0xFF9AA0AE) to Color(0xFF555B69)
 }
 
@@ -239,6 +240,18 @@ private fun DrawScope.drawSymbol(appId: String, dark: Boolean) {
                 drawCircle(Color(0xFFF2F2F7), 2.4f * u, o(10f, 5.5f)); drawCircle(Color(0xFFDDE3EC), 2.2f * u, o(13.5f, 4.8f)); drawCircle(Color(0xFFE9EDF3), 2f * u, o(15.5f, 6.2f))
             }
             drawRoundRect(Color(0xCCFFFFFF), o(4f, 5f), Size(16f * u, 1.6f * u), CornerRadius(0.8f * u))
+        }
+        AppIds.STORE -> {
+            // A glass shopping bag with a plus, drawn for this project.
+            val bag = Path().apply {
+                moveTo(4.5f * u, 8f * u); lineTo(19.5f * u, 8f * u); lineTo(18.5f * u, 20f * u)
+                lineTo(5.5f * u, 20f * u); close()
+            }
+            drawPath(bag, Brush.verticalGradient(listOf(Color(0x66FFFFFF), Color(0x22FFFFFF))))
+            drawPath(bag, white.copy(alpha = 0.9f), style = Stroke(0.7f * u))
+            drawArc(white.copy(alpha = 0.9f), -180f, 180f, false, o(8f, 4.4f), Size(8f * u, 7.2f * u), style = Stroke(0.9f * u))
+            drawLine(white, o(12f, 11.5f), o(12f, 16.5f), 1.4f * u)
+            drawLine(white, o(9.5f, 14f), o(14.5f, 14f), 1.4f * u)
         }
         AppIds.HELP -> {
             drawCircle(white.copy(alpha = 0.95f), 5.5f * u, o(12f, 10f))

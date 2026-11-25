@@ -392,30 +392,6 @@ fun HudPanel(modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------- Lock & sleep
 
 @Composable
-fun LockScreen(modifier: Modifier = Modifier) {
-    val desk = LocalDesktop.current
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
-    Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)).desktopGestures(key = "lock", onTap = {}).testTag("lock-screen")) {
-        Column(Modifier.align(Alignment.TopCenter).padding(top = 70.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            DeskText(SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date(now)), Desk.type.title.copy(fontSize = 20.sp), color = Color.White.copy(alpha = 0.9f))
-            DeskText(SimpleDateFormat(if (desk.settings.clock24h) "HH:mm" else "h:mm", Locale.getDefault()).format(Date(now)),
-                Desk.type.largeTitle.copy(fontSize = 96.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-2).sp), color = Color.White.copy(alpha = 0.92f))
-        }
-        Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(64.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
-                GlyphIcon(Glyph.Person, Color.White, 34.dp)
-            }
-            DeskText(desk.settings.userName, Desk.type.bodyStrong, color = Color.White, modifier = Modifier.padding(top = 8.dp))
-            Spacer(Modifier.height(10.dp))
-            GlassSurface(Modifier.desktopGestures(key = "unlock", onTap = { desk.overlay = Overlay.None; desk.play(UiSound.Open) }).testTag("unlock"), cornerRadius = 16.dp, material = GlassMaterial.Clear) {
-                DeskText("Click or tap to unlock", Desk.type.body, color = Color.White, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
-            }
-        }
-    }
-}
-
-@Composable
 fun SleepScreen(modifier: Modifier = Modifier) {
     val desk = LocalDesktop.current
     Box(modifier.fillMaxSize().background(Color.Black).desktopGestures(key = "sleep", onTap = { desk.overlay = Overlay.Locked }).testTag("sleep-screen"))

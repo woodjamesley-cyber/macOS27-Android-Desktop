@@ -2,6 +2,7 @@ package io.github.goldengate.desktop
 
 import android.Manifest
 import android.app.Application
+import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -50,6 +51,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.File
 import kotlin.math.abs
 
 /** Holds the desktop so windows, notifications and timers survive rotation and resizing. */
@@ -68,11 +70,18 @@ class MainActivity : ComponentActivity(), PlatformBridge {
     private var imageCallback: ((Uri?) -> Unit)? = null
     private var documentCallback: ((Uri?) -> Unit)? = null
     private var permissionCallback: ((Boolean) -> Unit)? = null
+    private var apkCallback: ((Uri?) -> Unit)? = null
+    private var homeCallback: ((Boolean) -> Unit)? = null
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { folderCallback?.invoke(it); folderCallback = null }
     private val imagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { imageCallback?.invoke(it); imageCallback = null }
     private val documentPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { documentCallback?.invoke(it); documentCallback = null }
     private val permissionRequest = registerForActivityResult(ActivityResultContracts.RequestPermission()) { permissionCallback?.invoke(it); permissionCallback = null }
+    private val apkPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { apkCallback?.invoke(it); apkCallback = null }
+    private val homeRoleRequest = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        homeCallback?.invoke(isDefaultLauncher())
+        homeCallback = null
+    }
 
     private val inputManager by lazy { getSystemService(INPUT_SERVICE) as InputManager }
     private val deviceListener = object : InputManager.InputDeviceListener {
@@ -92,7 +101,7 @@ class MainActivity : ComponentActivity(), PlatformBridge {
         if (vm.firstStart) {
             vm.firstStart = false
             desk.restoreSession()
-            if (desk.settings.demoNotifications) desk.postDemoNotifications()
+            if (desk.settings.demoNotifications && desk.settings.setupComplete) desk.postDemoNotifications()
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { desk.dismissAll() }
@@ -358,4 +367,138 @@ class MainActivity : ComponentActivity(), PlatformBridge {
     override fun quitApp() { desk.saveSession(); finishAndRemoveTask() }
 
     override fun toastFallback(text: String) { Toast.makeText(this, text, Toast.LENGTH_SHORT).show() }
+
+    // ---------------- App Store ----------------
+    override fun pickApk(onResult: (Uri?) -> Unit) {
+        apkCallback = onResult
+        try {
+            apkPicker.launch(arrayOf("application/vnd.android.package-archive", "application/octet-stream"))
+        } catch (e: ActivityNotFoundException) {
+            apkCallback = null
+            onResult(null)
+            toastFallback("No file picker is available on this device.")
+        }
+    }
+
+    override fun isPackageInstalled(packageName: String): Boolean = try {
+        packageManager.getPackageInfo(packageName, 0)
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
+    } catch (t: Throwable) {
+        false
+    }
+
+    override fun launchPackage(packageName: String): Boolean {
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
+        return try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            true
+        } catch (t: Throwable) {
+            toastFallback("Android couldn't open that app.")
+            false
+        }
+    }
+
+    override fun openStoreListing(packageName: String) {
+        val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(market)
+        } catch (e: ActivityNotFoundException) {
+            try {
+                startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            } catch (t: Throwable) {
+                toastFallback("No app store is available on this device.")
+            }
+        } catch (t: Throwable) {
+            toastFallback("No app store is available on this device.")
+        }
+    }
+
+    override fun installApk(file: File): Boolean {
+        if (!file.isFile) {
+            toastFallback("That APK is no longer in the App Library.")
+            return false
+        }
+        if (!packageManager.canRequestPackageInstalls()) {
+            toastFallback("Allow “Install unknown apps” for Golden Gate Desktop, then tap Install again.")
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            } catch (t: Throwable) {
+                openSystemPanel(SystemPanel.AppDetails)
+            }
+            return false
+        }
+        return try {
+            val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (t: Throwable) {
+            toastFallback("Android couldn't start the installer: ${t.message ?: "unknown error"}")
+            false
+        }
+    }
+
+    override fun openAppSettings(packageName: String) {
+        try {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        } catch (t: Throwable) {
+            toastFallback("Android Settings couldn't be opened.")
+        }
+    }
+
+    // ---------------- Default Home app (launcher) ----------------
+    override fun isDefaultLauncher(): Boolean = try {
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val resolved = packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
+        resolved?.activityInfo?.packageName == packageName
+    } catch (t: Throwable) {
+        false
+    }
+
+    override fun requestDefaultLauncher(onResult: (Boolean) -> Unit) {
+        if (isDefaultLauncher()) {
+            onResult(true)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roles = getSystemService(RoleManager::class.java)
+            if (roles != null && roles.isRoleAvailable(RoleManager.ROLE_HOME)) {
+                if (roles.isRoleHeld(RoleManager.ROLE_HOME)) {
+                    onResult(true)
+                    return
+                }
+                homeCallback = onResult
+                try {
+                    homeRoleRequest.launch(roles.createRequestRoleIntent(RoleManager.ROLE_HOME))
+                    return
+                } catch (t: Throwable) {
+                    homeCallback = null
+                }
+            }
+        }
+        // Older devices (and OEMs without the role API) use the Home app setting page.
+        openHomeSettings()
+        onResult(false)
+    }
+
+    override fun openHomeSettings() {
+        val candidates = listOf(Intent(Settings.ACTION_HOME_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+        for (intent in candidates) {
+            try {
+                startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            } catch (t: Throwable) {
+                // Try the next page.
+            }
+        }
+        toastFallback("Android Settings couldn't be opened.")
+    }
 }
