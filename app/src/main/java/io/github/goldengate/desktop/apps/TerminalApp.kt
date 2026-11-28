@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,6 +20,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -37,10 +39,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.goldengate.desktop.core.AndroidShell
 import io.github.goldengate.desktop.core.AppIds
 import io.github.goldengate.desktop.core.AppRegistry
 import io.github.goldengate.desktop.core.DeskWindow
-import io.github.goldengate.desktop.core.Shell
 import io.github.goldengate.desktop.core.ShellHost
 import io.github.goldengate.desktop.core.Shortcut
 import io.github.goldengate.desktop.core.menu
@@ -48,7 +50,9 @@ import io.github.goldengate.desktop.glass.Desk
 import io.github.goldengate.desktop.shell.WindowScaffold
 import io.github.goldengate.desktop.ui.DeskText
 import io.github.goldengate.desktop.ui.LocalDesktop
+import io.github.goldengate.desktop.ui.PushButton
 import io.github.goldengate.desktop.ui.desktopGestures
+import kotlinx.coroutines.launch
 import java.io.File
 
 private data class TermLine(val text: String, val kind: Int) // 0 output, 1 prompt+command, 2 error
@@ -56,8 +60,9 @@ private data class TermLine(val text: String, val kind: Int) // 0 output, 1 prom
 @Composable
 fun TerminalApp(win: DeskWindow) {
     val desk = LocalDesktop.current
+    val scope = rememberCoroutineScope()
     val shell = remember {
-        Shell(desk.fs.home, object : ShellHost {
+        AndroidShell(desk.fs.home, object : ShellHost {
             override val userName get() = desk.settings.userName
             override val hostName get() = desk.settings.computerName
             override fun open(target: File): Boolean { desk.openEntry(desk.fs.localEntry(target)); return true }
@@ -66,30 +71,49 @@ fun TerminalApp(win: DeskWindow) {
                 desk.launch(app.id); return true
             }
             override fun notify(title: String, body: String) = desk.notify(AppIds.TERMINAL, title, body)
-            override fun processes(): List<String> = listOf("launchd", "WindowServer", "Dock", "SystemUIServer") + desk.wm.windows.map { AppRegistry.name(it.appId) } + "zsh"
+            override fun processes(): List<String> = listOf("launchd", "WindowServer", "Dock", "SystemUIServer") + desk.wm.windows.map { AppRegistry.name(it.appId) } + "sh"
             override fun changed() = desk.refreshFs()
         })
     }
-    val lines = remember { mutableStateListOf(TermLine("Last login: ${java.text.SimpleDateFormat("EEE MMM d HH:mm:ss", java.util.Locale.US).format(java.util.Date())} on ttys000", 0), TermLine("Type 'help' to list commands.", 0)) }
+    val lines = remember {
+        mutableStateListOf(
+            TermLine("Golden Gate Terminal — Android /system/bin/sh", 0),
+            TermLine("Type 'help' for commands, or try: ls · getprop ro.product.model · df -h · uname -a", 0),
+        )
+    }
     var field by remember { mutableStateOf(TextFieldValue("")) }
     var histIdx by remember { mutableIntStateOf(-1) }
     var fontSize by remember { mutableStateOf(13f) }
+    var running by remember { mutableStateOf(false) }
+    var tick by remember { mutableIntStateOf(0) }
     val list = rememberLazyListState()
     val focus = remember { FocusRequester() }
     val green = Color(0xFF32D74B)
+    val prompt = remember(tick) { shell.prompt() }
 
-    LaunchedEffect(Unit) { win.title = "${desk.settings.userName.lowercase()} — zsh" }
-    LaunchedEffect(lines.size) { if (lines.isNotEmpty()) list.scrollToItem(lines.size) }
+    LaunchedEffect(Unit) { win.title = "${desk.settings.userName.lowercase()} — sh" }
+    LaunchedEffect(lines.size, running) { if (lines.isNotEmpty()) list.scrollToItem(lines.size) }
 
     fun submit() {
+        if (running) return
         val cmd = field.text
-        lines += TermLine(shell.prompt() + cmd, 1)
-        val r = shell.run(cmd)
-        if (r.clear) lines.clear()
-        else if (r.output.isNotEmpty()) r.output.split('\n').forEach { lines += TermLine(it, if (r.output.contains("not found") || r.output.contains(": No such") || r.output.contains("denied")) 2 else 0) }
-        if (r.exit) desk.close(win.id)
+        if (cmd.isBlank()) { field = TextFieldValue(""); return }
+        lines += TermLine(prompt + cmd, 1)
         field = TextFieldValue("")
         histIdx = -1
+        running = true
+        scope.launch {
+            val r = shell.run(cmd)
+            when {
+                r.clear -> lines.clear()
+                r.output.isNotEmpty() -> r.output.split('\n').forEach { line ->
+                    lines += TermLine(line, if (line.contains("not found") || line.contains("No such") || line.contains("denied")) 2 else 0)
+                }
+            }
+            running = false
+            tick++
+            if (r.exit) desk.close(win.id)
+        }
     }
 
     WindowMenus(win, listOf(
@@ -108,14 +132,24 @@ fun TerminalApp(win: DeskWindow) {
 
     val mono = Desk.type.mono.copy(fontSize = fontSize.sp, lineHeight = (fontSize * 1.35f).sp)
     WindowScaffold(win.title, contentBackground = Color(0xF21C1C1E), darkToolbar = true) {
-        Box(Modifier.fillMaxSize().background(Color(0xF21C1C1E)).desktopGestures(key = "term", onTap = { runCatching { focus.requestFocus() } }).testTag("terminal")) {
+        Box(
+            Modifier.fillMaxSize().background(Color(0xF21C1C1E))
+                .desktopGestures(key = "term", onTap = { runCatching { focus.requestFocus() } }).testTag("terminal"),
+        ) {
             LazyColumn(Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp), state = list) {
                 itemsIndexed(lines) { _, l ->
                     DeskText(l.text, mono, color = when (l.kind) { 1 -> Color.White; 2 -> Color(0xFFFF6961); else -> Color(0xFFE5E5EA) })
                 }
+                if (running) {
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                            DeskText("running…", mono, color = Color(0xFF8E8E93))
+                        }
+                    }
+                }
                 item {
                     Row(Modifier.fillMaxWidth()) {
-                        DeskText(shell.prompt(), mono, color = green)
+                        DeskText(prompt, mono, color = green)
                         BasicTextField(
                             field, { field = it },
                             Modifier.fillMaxWidth().focusRequester(focus).testTag("terminal-input").onPreviewKeyEvent { e ->
@@ -152,4 +186,3 @@ fun TerminalApp(win: DeskWindow) {
     }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 }
-

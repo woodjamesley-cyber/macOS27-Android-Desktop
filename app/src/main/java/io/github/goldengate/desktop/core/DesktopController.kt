@@ -2,6 +2,7 @@ package io.github.goldengate.desktop.core
 
 import android.app.Application
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -49,8 +50,11 @@ interface PlatformBridge {
     fun isPackageInstalled(packageName: String): Boolean
     fun launchPackage(packageName: String): Boolean
     fun openStoreListing(packageName: String)
-    /** Installs a retained APK through Android's package installer. Returns false if it couldn't start. */
-    fun installApk(file: File): Boolean
+    /** Installs a retained APK through Android's package installer. Returns false if it couldn't start.
+     *  When [launchAfterInstall] is set, the app opens by itself once Android finishes installing. */
+    fun installApk(file: File, launchAfterInstall: String? = null): Boolean
+    /** The real launcher icon of an installed app, if it is visible to this app. */
+    fun appIcon(packageName: String): Bitmap? = null
     fun openAppSettings(packageName: String)
     fun isDefaultLauncher(): Boolean
     /** Opens Android's "Home app" chooser (or its Settings page) and reports whether we became Home. */
@@ -113,6 +117,8 @@ class DesktopController(val app: Application, val scope: CoroutineScope) {
     var overlay by mutableStateOf<Overlay>(Overlay.None)
     /** Re-opens the Setup Assistant from System Settings even after setup is complete. */
     var showSetupAssistant by mutableStateOf(false)
+    /** Step the Setup Assistant opens on (Settings jumps straight to the account step). */
+    var setupStartStep by mutableIntStateOf(0)
     var openMenu by mutableStateOf<OpenMenu?>(null)
     var dialog by mutableStateOf<DialogSpec?>(null)
     var hud by mutableStateOf<Hud?>(null)

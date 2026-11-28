@@ -210,6 +210,24 @@ private fun GeneralPane(desk: DesktopController) {
         FormRow("Your name") { DeskTextField(s.userName, { v -> desk.set { it.copy(userName = v.take(32)) } }, Modifier.width(200.dp)) }
         FormRow("Computer name", divider = false) { DeskTextField(s.computerName, { v -> desk.set { it.copy(computerName = v.take(40)) } }, Modifier.width(200.dp)) }
     }
+    FormSection("Account", footer = "Your account lives on this device only. The password is stored as a salted SHA-256 hash and never leaves the phone.") {
+        if (s.accountCreated) {
+            FormRow(s.accountName.ifBlank { s.userName }, detail = s.accountEmail) {
+                PushButton("Edit…", { desk.setupStartStep = 2; desk.showSetupAssistant = true }, glyph = Glyph.Person)
+            }
+            FormRow("Sign out", detail = "Your files, apps and settings are kept.", divider = false) {
+                PushButton(
+                    "Sign Out",
+                    { desk.set { it.copy(accountName = "", accountEmail = "", accountSalt = "", accountHash = "") } },
+                    destructive = true,
+                )
+            }
+        } else {
+            FormRow("No account yet", detail = "Create one to personalise the lock screen and menu bar.", divider = false) {
+                PushButton("Create Account…", { desk.setupStartStep = 2; desk.showSetupAssistant = true }, primary = true)
+            }
+        }
+    }
     FormSection("Desktop") {
         FormRow("Desktops (Spaces)") { SegmentedControl((1..6).map { it.toString() }, s.spaces - 1, { i -> desk.set { it.copy(spaces = i + 1) }; desk.wm.spaceCount = i + 1; desk.wm.switchSpace(desk.wm.currentSpace) }) }
         Toggle("Reopen windows when returning", s.reopenWindows, "Restores open apps and window positions the next time you start Golden Gate Desktop.", divider = false) { v -> desk.set { it.copy(reopenWindows = v) } }
@@ -244,7 +262,7 @@ private fun GeneralPane(desk: DesktopController) {
         FormRow("Android Home settings", divider = false) { PushButton("Open…", { desk.bridge?.openHomeSettings() }) }
     }
     FormSection("Setup Assistant", footer = "Reopens the first-run guide to change appearance, account, passcode and Home app.") {
-        FormRow("Setup Assistant", divider = false) { PushButton("Open…", { desk.showSetupAssistant = true }) }
+        FormRow("Setup Assistant", divider = false) { PushButton("Open…", { desk.setupStartStep = 0; desk.showSetupAssistant = true }) }
     }
     FormSection("Restart", footer = "Resetting restores every setting to its default. Your files are kept.") {
         FormRow("Restart Desktop", detail = "Closes all windows and rebuilds the desktop.") { PushButton("Restart…", { desk.restartDesktop() }) }

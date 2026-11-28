@@ -302,14 +302,20 @@ fun DeskSlider(
 fun DeskTextField(
     value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "",
     glyph: Glyph? = null, singleLine: Boolean = true, onSubmit: (() -> Unit)? = null, style: TextStyle = Desk.type.body,
-    rounded: Dp = 7.dp,
+    rounded: Dp = 7.dp, password: Boolean = false,
 ) {
     val c = Desk.colors
     BasicTextField(
         value = value, onValueChange = onChange, singleLine = singleLine,
         textStyle = style.copy(color = c.text),
         cursorBrush = SolidColor(c.accent),
-        keyboardOptions = KeyboardOptions(imeAction = if (onSubmit != null) ImeAction.Go else ImeAction.Default),
+        visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation()
+        else androidx.compose.ui.text.input.VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(
+            imeAction = if (onSubmit != null) ImeAction.Go else ImeAction.Default,
+            keyboardType = if (password) androidx.compose.ui.text.input.KeyboardType.Password
+            else androidx.compose.ui.text.input.KeyboardType.Text,
+        ),
         keyboardActions = KeyboardActions(onGo = { onSubmit?.invoke() }, onDone = { onSubmit?.invoke() }),
         modifier = modifier,
         decorationBox = { inner ->

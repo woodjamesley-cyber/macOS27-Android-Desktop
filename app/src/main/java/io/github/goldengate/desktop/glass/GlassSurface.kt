@@ -1,6 +1,12 @@
 package io.github.goldengate.desktop.glass
 
 import android.os.Build
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -113,6 +119,18 @@ fun GlassSurface(
     val effectiveSource = if (recordingInto == GlassSource.Desktop) GlassSource.Wallpaper else source
     val opaque = glass.reduceTransparency || backdrops == null || recordingInto == GlassSource.Wallpaper
 
+    // A slow specular sweep gives the surface the "liquid" read of macOS 27 glass. It costs one
+    // animated gradient and is disabled with Reduce Motion.
+    val sheen = if (theme.reduceMotion) 0.55f else {
+        val transition = rememberInfiniteTransition(label = "glass-sheen")
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(15000, easing = LinearEasing), RepeatMode.Restart),
+            label = "sheen-position",
+        ).value
+    }
+
     val radiusPx = with(density) { cornerRadius.toPx() }
     val blurPx = with(density) { (material.blurDp * (0.75f + tint * 0.6f)).dp.toPx() }
     val saturation = 1.0f + (1f - tint) * 0.6f
@@ -176,6 +194,23 @@ fun GlassSurface(
                     }
                 }
         )
+        if (!opaque && !theme.reduceMotion) {
+            Box(
+                Modifier.matchParentSize().drawBehind {
+                    val band = size.width * 0.42f
+                    val x = -band + sheen * (size.width + band * 2f)
+                    drawRect(
+                        Brush.linearGradient(
+                            0f to Color.Transparent,
+                            0.5f to Color.White.copy(alpha = if (colors.dark) 0.075f else 0.13f),
+                            1f to Color.Transparent,
+                            start = Offset(x, 0f),
+                            end = Offset(x + band, size.height * 0.8f),
+                        )
+                    )
+                }
+            )
+        }
         content()
     }
 }
@@ -217,6 +252,26 @@ fun DrawScope.drawGlassRim(radiusPx: Float, dark: Boolean, contrast: Boolean) {
         ),
         cornerRadius = cr,
     )
+    // soft inner shadow along the bottom edge, as if the glass has thickness
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            0.55f to Color.Transparent,
+            1f to Color.Black.copy(alpha = if (dark) 0.22f else 0.10f),
+        ),
+        cornerRadius = cr,
+    )
+    // secondary inner highlight just below the top edge (the "lens" bevel)
+    val bevel = 1.6f * density
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            0f to Color.White.copy(alpha = if (dark) 0.30f else 0.55f),
+            0.12f to Color.White.copy(alpha = 0.0f),
+        ),
+        topLeft = Offset(bevel, bevel),
+        size = Size(w - bevel * 2, h - bevel * 2),
+        cornerRadius = CornerRadius((radiusPx - bevel).coerceAtLeast(0f)),
+        style = Stroke(bevel),
+    )
     // specular highlight stroke (light comes from the top-left)
     val stroke = 1.2f * density
     drawRoundRect(
@@ -231,6 +286,17 @@ fun DrawScope.drawGlassRim(radiusPx: Float, dark: Boolean, contrast: Boolean) {
         size = Size(w - stroke, h - stroke),
         cornerRadius = CornerRadius((radiusPx - stroke / 2).coerceAtLeast(0f)),
         style = Stroke(stroke),
+    )
+    // prismatic edge: a whisper of cyan and pink, as if white light is splitting through the rim
+    drawRoundRect(
+        brush = Brush.linearGradient(
+            0f to Color(0xFF7BD5FF).copy(alpha = if (dark) 0.22f else 0.30f),
+            0.45f to Color.Transparent,
+            1f to Color(0xFFFF8AD8).copy(alpha = if (dark) 0.16f else 0.24f),
+            start = Offset(0f, 0f), end = Offset(w, h),
+        ),
+        cornerRadius = cr,
+        style = Stroke(1.1f * density),
     )
     // darkened outer edge for separation from the content behind
     drawRoundRect(

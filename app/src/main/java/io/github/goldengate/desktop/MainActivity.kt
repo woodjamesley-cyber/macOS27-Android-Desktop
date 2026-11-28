@@ -7,6 +7,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.hardware.input.InputManager
 import android.net.Uri
 import android.os.Build
@@ -72,6 +74,8 @@ class MainActivity : ComponentActivity(), PlatformBridge {
     private var permissionCallback: ((Boolean) -> Unit)? = null
     private var apkCallback: ((Uri?) -> Unit)? = null
     private var homeCallback: ((Boolean) -> Unit)? = null
+    /** Package to open as soon as Android finishes installing it. */
+    private var pendingLaunch: String? = null
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { folderCallback?.invoke(it); folderCallback = null }
     private val imagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { imageCallback?.invoke(it); imageCallback = null }
@@ -119,6 +123,27 @@ class MainActivity : ComponentActivity(), PlatformBridge {
 
     override fun onStart() { super.onStart(); desk.onStart() }
     override fun onStop() { desk.onStop(); super.onStop() }
+
+    private var pendingLaunchJob: Job? = null
+
+    override fun onResume() {
+        super.onResume()
+        // The user comes back here after confirming an install. Android may resume us before the
+        // package manager has finished, so poll briefly and open the app the moment it appears.
+        val pkg = pendingLaunch ?: return
+        if (pendingLaunchJob?.isActive == true) return
+        pendingLaunchJob = lifecycleScope.launch {
+            repeat(40) {
+                if (isPackageInstalled(pkg)) {
+                    pendingLaunch = null
+                    launchPackage(pkg)
+                    return@launch
+                }
+                delay(500)
+            }
+            pendingLaunch = null
+        }
+    }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -418,7 +443,7 @@ class MainActivity : ComponentActivity(), PlatformBridge {
         }
     }
 
-    override fun installApk(file: File): Boolean {
+    override fun installApk(file: File, launchAfterInstall: String?): Boolean {
         if (!file.isFile) {
             toastFallback("That APK is no longer in the App Library.")
             return false
@@ -439,11 +464,25 @@ class MainActivity : ComponentActivity(), PlatformBridge {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
+            pendingLaunch = launchAfterInstall?.takeIf { !isPackageInstalled(it) }
             true
         } catch (t: Throwable) {
             toastFallback("Android couldn't start the installer: ${t.message ?: "unknown error"}")
             false
         }
+    }
+
+    override fun appIcon(packageName: String): Bitmap? = try {
+        val info = packageManager.getApplicationInfo(packageName, 0)
+        val drawable = packageManager.getApplicationIcon(info)
+        val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
+        val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
+        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            drawable.setBounds(0, 0, width, height)
+            drawable.draw(Canvas(bitmap))
+        }
+    } catch (t: Throwable) {
+        null
     }
 
     override fun openAppSettings(packageName: String) {

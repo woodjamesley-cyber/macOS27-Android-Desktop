@@ -1,5 +1,15 @@
 package io.github.goldengate.desktop.shell
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,12 +42,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.goldengate.desktop.core.AppIds
 import io.github.goldengate.desktop.core.Appearance
 import io.github.goldengate.desktop.core.DockPosition
+import io.github.goldengate.desktop.core.LocalAccount
 import io.github.goldengate.desktop.glass.Accent
 import io.github.goldengate.desktop.glass.Desk
 import io.github.goldengate.desktop.glass.GlassMaterial
@@ -60,28 +74,76 @@ fun SetupAssistant(modifier: Modifier = Modifier) {
     val desk = LocalDesktop.current
     val s = desk.settings
     val c = Desk.colors
-    var step by remember { mutableIntStateOf(0) }
+    var step by remember { mutableIntStateOf(desk.setupStartStep.coerceIn(0, setupTitles.lastIndex)) }
     var name by remember { mutableStateOf(if (s.userName == "Guest") "" else s.userName) }
     var computer by remember { mutableStateOf(s.computerName) }
     var pin by remember { mutableStateOf(s.lockPin) }
+    var email by remember { mutableStateOf(s.accountEmail) }
+    var password by remember { mutableStateOf("") }
+    var avatar by remember { mutableIntStateOf(s.accountAvatar) }
+    var accountError by remember { mutableStateOf<String?>(null) }
     var isDefaultHome by remember { mutableStateOf(desk.bridge?.isDefaultLauncher() == true) }
+    var shown by remember { mutableStateOf(false) }
+    val appear by animateFloatAsState(
+        if (shown) 1f else 0f,
+        spring(dampingRatio = 0.82f, stiffness = 420f),
+        label = "setupAppear",
+    )
+    LaunchedEffect(Unit) { shown = true }
+
+    fun validateAccount(): Boolean {
+        val e = email.trim()
+        when {
+            e.isEmpty() && password.isEmpty() -> { accountError = null; return true }
+            e.isEmpty() -> { accountError = "Enter the email address for your account, or leave both fields empty to skip."; return false }
+            !LocalAccount.isValidEmail(e) -> { accountError = "That doesn't look like an email address — try name@example.com."; return false }
+            password.isEmpty() && !(s.accountCreated && e.equals(s.accountEmail, true)) -> {
+                accountError = "Choose a password with at least ${LocalAccount.MIN_PASSWORD_LENGTH} characters."; return false
+            }
+            password.isNotEmpty() && password.length < LocalAccount.MIN_PASSWORD_LENGTH -> {
+                accountError = "Use at least ${LocalAccount.MIN_PASSWORD_LENGTH} characters for your password."; return false
+            }
+        }
+        accountError = null
+        return true
+    }
 
     fun saveIdentity() {
+        val trimmedEmail = email.trim().lowercase()
+        val sameEmail = s.accountCreated && trimmedEmail == s.accountEmail
+        val salt = if (sameEmail && s.accountSalt.isNotBlank()) s.accountSalt else LocalAccount.newSalt()
+        val hash = when {
+            trimmedEmail.isEmpty() -> s.accountHash
+            password.isNotEmpty() -> LocalAccount.hash(password, salt)
+            sameEmail -> s.accountHash
+            else -> s.accountHash
+        }
         desk.updateSettings {
             it.copy(
                 userName = name.trim().ifBlank { "Guest" }.take(24),
                 computerName = computer.trim().ifBlank { "Android Desktop" }.take(32),
                 lockPin = pin.filter { ch -> ch.isDigit() }.take(8),
+                accountName = if (trimmedEmail.isEmpty()) it.accountName
+                else name.trim().ifBlank { trimmedEmail.substringBefore('@') }.take(48),
+                accountEmail = if (trimmedEmail.isEmpty()) it.accountEmail else trimmedEmail,
+                accountSalt = if (trimmedEmail.isEmpty()) it.accountSalt else salt,
+                accountHash = hash,
+                accountAvatar = avatar,
             )
         }
     }
 
     fun finish() {
+        if (!validateAccount()) { step = 2; return }
         saveIdentity()
         desk.updateSettings { it.copy(setupComplete = true) }
         desk.showSetupAssistant = false
+        desk.setupStartStep = 0
         desk.play(io.github.goldengate.desktop.audio.UiSound.Open)
-        desk.notify(AppIds.HELP, "You're all set", "Your desktop is ready. Open the App Store to add real Android apps, or drag the Dock's inner edge to resize it.")
+        desk.notify(
+            AppIds.HELP, "You're all set",
+            "Your desktop is ready. Open the App Store to download and install real Android apps, or drag the Dock's inner edge to resize it.",
+        )
     }
 
     BoxWithConstraints(
@@ -103,6 +165,11 @@ fun SetupAssistant(modifier: Modifier = Modifier) {
         GlassSurface(
             Modifier.widthIn(max = 620.dp).fillMaxWidth(0.94f)
                 .heightIn(max = minOf(660.dp, maxHeight * 0.94f))
+                .graphicsLayer {
+                    alpha = appear
+                    scaleX = 0.94f + 0.06f * appear
+                    scaleY = 0.94f + 0.06f * appear
+                }
                 .padding(vertical = 12.dp).testTag("setup-card"),
             cornerRadius = 26.dp, material = GlassMaterial.Menu, elevation = 30.dp,
         ) {
@@ -125,23 +192,43 @@ fun SetupAssistant(modifier: Modifier = Modifier) {
                 Column(
                     Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 16.dp),
                 ) {
-                    when (step) {
-                        0 -> WelcomeStep()
-                        1 -> AppearanceStep(desk)
-                        2 -> AccountStep(name, { name = it.take(24) }, computer, { computer = it.take(32) })
-                        else -> LockAndHomeStep(
-                            pin = pin,
-                            onPinChange = { pin = it.filter { ch -> ch.isDigit() }.take(8) },
-                            isDefaultHome = isDefaultHome,
-                            askDefaultHome = {
-                                isDefaultHome = desk.bridge?.isDefaultLauncher() == true
-                                desk.bridge?.requestDefaultLauncher { granted ->
-                                    isDefaultHome = granted || desk.bridge?.isDefaultLauncher() == true
-                                    if (!granted) desk.bridge?.toastFallback("Allow Golden Gate Desktop as your Home app in Android Settings")
-                                }
-                            },
-                            openHomeSettings = { desk.bridge?.openHomeSettings() },
-                        )
+                    AnimatedContent(
+                        targetState = step,
+                        transitionSpec = {
+                            val direction = if (targetState >= initialState) 1 else -1
+                            (fadeIn(tween(220)) + slideInHorizontally(tween(280)) { it / 6 * direction }) togetherWith
+                                (fadeOut(tween(110)) + slideOutHorizontally(tween(240)) { -it / 6 * direction })
+                        },
+                        label = "setup-step",
+                    ) { current ->
+                        Column(Modifier.fillMaxWidth()) {
+                            when (current) {
+                                0 -> WelcomeStep()
+                                1 -> AppearanceStep(desk)
+                                2 -> AccountStep(
+                                    name = name, onName = { name = it.take(48) },
+                                    email = email, onEmail = { email = it.trim().take(120); accountError = null },
+                                    password = password, onPassword = { password = it.take(64); accountError = null },
+                                    avatar = avatar, onAvatar = { avatar = it },
+                                    computer = computer, onComputer = { computer = it.take(32) },
+                                    signedInEmail = if (s.accountCreated) s.accountEmail else "",
+                                    error = accountError,
+                                )
+                                else -> LockAndHomeStep(
+                                    pin = pin,
+                                    onPinChange = { pin = it.filter { ch -> ch.isDigit() }.take(8) },
+                                    isDefaultHome = isDefaultHome,
+                                    askDefaultHome = {
+                                        isDefaultHome = desk.bridge?.isDefaultLauncher() == true
+                                        desk.bridge?.requestDefaultLauncher { granted ->
+                                            isDefaultHome = granted || desk.bridge?.isDefaultLauncher() == true
+                                            if (!granted) desk.bridge?.toastFallback("Allow Golden Gate Desktop as your Home app in Android Settings")
+                                        }
+                                    },
+                                    openHomeSettings = { desk.bridge?.openHomeSettings() },
+                                )
+                            }
+                        }
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -149,8 +236,11 @@ fun SetupAssistant(modifier: Modifier = Modifier) {
                     Spacer(Modifier.weight(1f))
                     if (step > 0) PushButton("Back", { step-- })
                     Spacer(Modifier.width(6.dp))
-                    if (step < setupTitles.lastIndex) PushButton("Continue", { step++ }, primary = true)
-                    else PushButton("Finish", { finish() }, primary = true)
+                    if (step < setupTitles.lastIndex) PushButton(
+                        "Continue",
+                        { if (step != 2 || validateAccount()) step++ },
+                        primary = true,
+                    ) else PushButton("Finish", { finish() }, primary = true)
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.Center) {
                     repeat(setupTitles.size) { i ->
@@ -267,27 +357,96 @@ private fun AppearanceStep(desk: io.github.goldengate.desktop.core.DesktopContro
 }
 
 @Composable
-private fun AccountStep(name: String, onName: (String) -> Unit, computer: String, onComputer: (String) -> Unit) {
+private fun AccountStep(
+    name: String, onName: (String) -> Unit,
+    email: String, onEmail: (String) -> Unit,
+    password: String, onPassword: (String) -> Unit,
+    avatar: Int, onAvatar: (Int) -> Unit,
+    computer: String, onComputer: (String) -> Unit,
+    signedInEmail: String,
+    error: String?,
+) {
     val c = Desk.colors
-    DeskText("Who is using this desktop?", Desk.type.title)
-    DeskText("This name appears on the lock screen, in the menu bar and in the Terminal prompt.", Desk.type.caption, color = c.secondaryText, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+    val gradient = LocalAccount.gradient(avatar)
+    DeskText(if (signedInEmail.isBlank()) "Create your account" else "Your account", Desk.type.title)
+    DeskText(
+        if (signedInEmail.isBlank())
+            "Your account personalises the lock screen and menu bar. It's created on this device only — " +
+                "the password is salted and hashed, and nothing is uploaded anywhere."
+        else "Signed in as $signedInEmail. Change any detail below to update your account.",
+        Desk.type.caption, color = c.secondaryText,
+        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp).widthIn(max = 480.dp),
+    )
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(56.dp).clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Color(0xFFB8C6FF), Color(0xFF7C8CE0)))),
+            Modifier.size(62.dp).clip(CircleShape)
+                .background(Brush.linearGradient(listOf(Color(gradient.first), Color(gradient.second))))
+                .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
             contentAlignment = Alignment.Center,
-        ) { GlyphIcon(Glyph.Person, Color.White, 30.dp) }
+        ) {
+            DeskText(
+                LocalAccount.initials(name, email),
+                Desk.type.title.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+            )
+        }
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.widthIn(max = 300.dp)) {
-            DeskText("Your name", Desk.type.caption, color = c.secondaryText)
-            DeskTextField(name, onName, Modifier.fillMaxWidth().testTag("setup-name"), placeholder = "Guest")
+        Column {
+            DeskText("Avatar colour", Desk.type.caption, color = c.secondaryText)
+            Row(Modifier.padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LocalAccount.avatarGradients.forEachIndexed { i, pair ->
+                    val selected = avatar == i
+                    Box(
+                        Modifier.size(20.dp).clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(Color(pair.first), Color(pair.second))))
+                            .border(
+                                if (selected) 2.dp else 0.dp,
+                                if (selected) c.text.copy(alpha = 0.8f) else Color.Transparent,
+                                CircleShape,
+                            )
+                            .desktopGestures(key = "sa-avatar-$i", onTap = { onAvatar(i) })
+                            .testTag("setup-avatar-$i"),
+                    )
+                }
+            }
         }
     }
     Spacer(Modifier.height(14.dp))
-    Column(Modifier.widthIn(max = 300.dp)) {
-        DeskText("Computer name", Desk.type.caption, color = c.secondaryText)
-        DeskTextField(computer, onComputer, Modifier.fillMaxWidth().testTag("setup-computer"), placeholder = "Android Desktop")
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.widthIn(max = 220.dp)) {
+            DeskText("Full name", Desk.type.caption, color = c.secondaryText)
+            DeskTextField(name, onName, Modifier.fillMaxWidth().testTag("setup-name"), placeholder = "Alex Rivera")
+        }
+        Column(Modifier.widthIn(max = 220.dp)) {
+            DeskText("Computer name", Desk.type.caption, color = c.secondaryText)
+            DeskTextField(computer, onComputer, Modifier.fillMaxWidth().testTag("setup-computer"), placeholder = "Android Desktop")
+        }
     }
+    Spacer(Modifier.height(10.dp))
+    Column(Modifier.widthIn(max = 300.dp)) {
+        DeskText("Email", Desk.type.caption, color = c.secondaryText)
+        DeskTextField(email, onEmail, Modifier.fillMaxWidth().testTag("setup-email"), placeholder = "you@example.com")
+    }
+    Spacer(Modifier.height(10.dp))
+    Column(Modifier.widthIn(max = 300.dp)) {
+        DeskText("Password", Desk.type.caption, color = c.secondaryText)
+        DeskTextField(
+            password, onPassword, Modifier.fillMaxWidth().testTag("setup-password"),
+            placeholder = if (signedInEmail.isBlank()) "At least ${LocalAccount.MIN_PASSWORD_LENGTH} characters"
+            else "Leave empty to keep the current password",
+            password = true,
+        )
+    }
+    if (error != null) {
+        DeskText(
+            error, Desk.type.small, color = Color(0xFFFF6961),
+            modifier = Modifier.padding(top = 8.dp).widthIn(max = 480.dp).testTag("setup-account-error"),
+        )
+    }
+    DeskText(
+        "Leave the email and password empty to use the desktop as a guest. You can create an account later in System Settings.",
+        Desk.type.small, color = c.tertiaryText, modifier = Modifier.padding(top = 10.dp).widthIn(max = 500.dp),
+    )
 }
 
 @Composable

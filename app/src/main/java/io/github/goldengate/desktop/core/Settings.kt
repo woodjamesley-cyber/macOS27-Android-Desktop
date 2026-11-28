@@ -84,7 +84,17 @@ data class SystemSettings(
     val setupComplete: Boolean = false,
     /** Optional 4–8 digit lock screen passcode; blank means unlock with a tap. */
     val lockPin: String = "",
-)
+    /** Local account created in the Setup Assistant. Stored only on this device. */
+    val accountName: String = "",
+    val accountEmail: String = "",
+    val accountSalt: String = "",
+    /** Salted SHA-256 of the account password — never the password itself. */
+    val accountHash: String = "",
+    val accountAvatar: Int = 0,
+) {
+    /** True when a local account has been created on this device. */
+    val accountCreated: Boolean get() = accountEmail.isNotBlank() && accountHash.isNotBlank()
+}
 
 class SettingsStore(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("system_settings", Context.MODE_PRIVATE)
@@ -152,6 +162,11 @@ class SettingsStore(context: Context) {
             spaces = p.getInt("spaces", d.spaces).coerceIn(1, 6),
             setupComplete = p.getBoolean("setupComplete", d.setupComplete),
             lockPin = p.getString("lockPin", d.lockPin)?.filter { it.isDigit() }?.take(8) ?: "",
+            accountName = p.getString("accountName", d.accountName) ?: d.accountName,
+            accountEmail = p.getString("accountEmail", d.accountEmail) ?: d.accountEmail,
+            accountSalt = p.getString("accountSalt", d.accountSalt) ?: d.accountSalt,
+            accountHash = p.getString("accountHash", d.accountHash) ?: d.accountHash,
+            accountAvatar = p.getInt("accountAvatar", d.accountAvatar),
         )
     }
 
@@ -200,6 +215,11 @@ class SettingsStore(context: Context) {
             putInt("spaces", s.spaces)
             putBoolean("setupComplete", s.setupComplete)
             putString("lockPin", s.lockPin)
+            putString("accountName", s.accountName)
+            putString("accountEmail", s.accountEmail)
+            putString("accountSalt", s.accountSalt)
+            putString("accountHash", s.accountHash)
+            putInt("accountAvatar", s.accountAvatar)
         }.apply()
     }
 

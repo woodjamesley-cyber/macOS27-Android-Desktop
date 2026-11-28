@@ -1,5 +1,10 @@
 package io.github.goldengate.desktop.shell
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -41,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.goldengate.desktop.audio.UiSound
+import io.github.goldengate.desktop.core.LocalAccount
 import io.github.goldengate.desktop.core.Overlay
 import io.github.goldengate.desktop.glass.Desk
 import io.github.goldengate.desktop.glass.GlassMaterial
@@ -68,12 +74,26 @@ fun LockScreen(modifier: Modifier = Modifier) {
     var wrong by remember { mutableStateOf(false) }
     val requiresPin = s.lockPin.isNotEmpty()
     val focus = remember { FocusRequester() }
+    val shake = remember { Animatable(0f) }
+    val avatar = LocalAccount.gradient(s.accountAvatar)
+    var shown by remember { mutableStateOf(false) }
+    val appear by animateFloatAsState(
+        if (shown) 1f else 0f,
+        spring(dampingRatio = 0.78f, stiffness = 360f),
+        label = "lockAppear",
+    )
+    LaunchedEffect(Unit) { shown = true }
 
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
     LaunchedEffect(requiresPin) { if (requiresPin) runCatching { focus.requestFocus() } }
     LaunchedEffect(wrong) {
         if (wrong) {
-            delay(1200)
+            repeat(3) {
+                shake.animateTo(11f, tween(45))
+                shake.animateTo(-11f, tween(45))
+            }
+            shake.animateTo(0f, tween(40))
+            delay(600)
             wrong = false
         }
     }
@@ -138,7 +158,8 @@ fun LockScreen(modifier: Modifier = Modifier) {
 
         val timeSize = (maxWidth.value * 0.19f).coerceIn(48f, 104f).sp
         Column(
-            Modifier.align(Alignment.TopCenter).padding(top = if (maxHeight < 500.dp) 30.dp else 64.dp),
+            Modifier.align(Alignment.TopCenter).padding(top = if (maxHeight < 500.dp) 30.dp else 64.dp)
+                .graphicsLayer { alpha = appear; translationY = (1f - appear) * -26f },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             DeskText(
@@ -164,16 +185,32 @@ fun LockScreen(modifier: Modifier = Modifier) {
         }
 
         Column(
-            Modifier.align(Alignment.BottomCenter).padding(bottom = if (maxHeight < 500.dp) 16.dp else 40.dp),
+            Modifier.align(Alignment.BottomCenter).padding(bottom = if (maxHeight < 500.dp) 16.dp else 40.dp)
+                .graphicsLayer { alpha = appear; translationY = (1f - appear) * 30f },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
-                Modifier.size(54.dp).clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Color(0xFFB8C6FF), Color(0xFF7C8CE0))))
+                Modifier.size(56.dp).clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Color(avatar.first), Color(avatar.second))))
                     .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape),
                 contentAlignment = Alignment.Center,
-            ) { GlyphIcon(Glyph.Person, Color.White, 30.dp) }
-            DeskText(s.userName, Desk.type.bodyStrong, color = Color.White, modifier = Modifier.padding(top = 5.dp))
+            ) {
+                DeskText(
+                    LocalAccount.initials(s.accountName.ifBlank { s.userName }, s.accountEmail),
+                    Desk.type.title.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+            }
+            DeskText(
+                s.accountName.ifBlank { s.userName }, Desk.type.bodyStrong, color = Color.White,
+                modifier = Modifier.padding(top = 5.dp),
+            )
+            if (s.accountCreated) {
+                DeskText(
+                    s.accountEmail, Desk.type.small, color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
 
             if (requiresPin) {
                 DeskText(
@@ -181,10 +218,11 @@ fun LockScreen(modifier: Modifier = Modifier) {
                     Desk.type.caption,
                     color = if (wrong) Color(0xFFFFB4AB) else Color.White.copy(alpha = 0.75f),
                     modifier = Modifier.padding(top = 6.dp, bottom = 6.dp)
-                        .graphicsLayer { translationX = if (wrong) 8f else 0f },
                 )
                 GlassSurface(
-                    Modifier.widthIn(max = 290.dp).testTag("lock-keypad"),
+                    Modifier.widthIn(max = 290.dp)
+                        .graphicsLayer { translationX = shake.value }
+                        .testTag("lock-keypad"),
                     cornerRadius = 20.dp, material = GlassMaterial.Menu, elevation = 18.dp,
                 ) {
                     Column(
