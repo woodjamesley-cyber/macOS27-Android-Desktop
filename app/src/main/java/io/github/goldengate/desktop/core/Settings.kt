@@ -55,6 +55,8 @@ data class SystemSettings(
     val dockAutoHide: Boolean = false,
     val dockShowRecents: Boolean = true,
     val dockApps: List<String> = AppIds.defaultDock,
+    /** Apps shown as shortcut icons on the desktop wallpaper. */
+    val desktopApps: List<String> = listOf(AppIds.STORE),
     val minimizeEffect: MinimizeEffect = MinimizeEffect.Genie,
     val uiSounds: Boolean = true,
     val uiVolume: Float = 0.55f,
@@ -118,6 +120,17 @@ class SettingsStore(context: Context) {
     private fun load(): SystemSettings {
         val d = SystemSettings()
         val p = prefs
+        // Installs created before the App Store existed kept their old Dock list. Pin the store
+        // once for them; removing it afterwards sticks.
+        val storedDock = p.getString("dockApps", null)?.split(',')?.filter { it.isNotBlank() }
+        val dockApps = when {
+            storedDock == null -> d.dockApps
+            !p.getBoolean("storePinnedMigration", false) -> {
+                p.edit().putBoolean("storePinnedMigration", true).apply()
+                if (AppIds.STORE in storedDock) storedDock else storedDock + AppIds.STORE
+            }
+            else -> storedDock
+        }
         return SystemSettings(
             appearance = enumOr(p.getString("appearance", null), d.appearance),
             accent = p.getInt("accent", d.accent),
@@ -134,7 +147,8 @@ class SettingsStore(context: Context) {
             dockPosition = enumOr(p.getString("dockPosition", null), d.dockPosition),
             dockAutoHide = p.getBoolean("dockAutoHide", d.dockAutoHide),
             dockShowRecents = p.getBoolean("dockShowRecents", d.dockShowRecents),
-            dockApps = p.getString("dockApps", null)?.split(',')?.filter { it.isNotBlank() } ?: d.dockApps,
+            dockApps = dockApps,
+            desktopApps = p.getString("desktopApps", null)?.split(',')?.filter { it.isNotBlank() } ?: d.desktopApps,
             minimizeEffect = enumOr(p.getString("minimizeEffect", null), d.minimizeEffect),
             uiSounds = p.getBoolean("uiSounds", d.uiSounds),
             uiVolume = p.getFloat("uiVolume", d.uiVolume),
@@ -188,6 +202,7 @@ class SettingsStore(context: Context) {
             putBoolean("dockAutoHide", s.dockAutoHide)
             putBoolean("dockShowRecents", s.dockShowRecents)
             putString("dockApps", s.dockApps.joinToString(","))
+            putString("desktopApps", s.desktopApps.joinToString(","))
             putString("minimizeEffect", s.minimizeEffect.name)
             putBoolean("uiSounds", s.uiSounds)
             putFloat("uiVolume", s.uiVolume)

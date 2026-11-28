@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity(), PlatformBridge {
         if (vm.firstStart) {
             vm.firstStart = false
             desk.restoreSession()
+            if (desk.settings.setupComplete && desk.settings.accountCreated) desk.overlay = Overlay.Locked
             if (desk.settings.demoNotifications && desk.settings.setupComplete) desk.postDemoNotifications()
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -122,12 +123,29 @@ class MainActivity : ComponentActivity(), PlatformBridge {
     }
 
     override fun onStart() { super.onStart(); desk.onStart() }
-    override fun onStop() { desk.onStop(); super.onStop() }
+
+    override fun onStop() {
+        desk.onStop()
+        // "Every time I leave and come back": lock whenever the desktop is fully hidden, but not
+        // for a rotation/config change and not while the Setup Assistant is open.
+        if (!isChangingConfigurations && desk.settings.setupComplete &&
+            desk.settings.accountCreated && !desk.showSetupAssistant
+        ) desk.overlay = Overlay.Locked
+        super.onStop()
+    }
 
     private var pendingLaunchJob: Job? = null
 
     override fun onResume() {
         super.onResume()
+        launchPendingWhenInstalled()
+    }
+
+    /** Opening an app waits until the lock screen is out of the way. */
+    override fun onUnlocked() = launchPendingWhenInstalled()
+
+    private fun launchPendingWhenInstalled() {
+        if (desk.overlay is Overlay.Locked) return
         // The user comes back here after confirming an install. Android may resume us before the
         // package manager has finished, so poll briefly and open the app the moment it appears.
         val pkg = pendingLaunch ?: return

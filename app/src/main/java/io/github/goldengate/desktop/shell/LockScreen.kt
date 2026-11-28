@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -52,9 +53,11 @@ import io.github.goldengate.desktop.glass.Desk
 import io.github.goldengate.desktop.glass.GlassMaterial
 import io.github.goldengate.desktop.glass.GlassSurface
 import io.github.goldengate.desktop.ui.DeskText
+import io.github.goldengate.desktop.ui.DeskTextField
 import io.github.goldengate.desktop.ui.Glyph
 import io.github.goldengate.desktop.ui.GlyphIcon
 import io.github.goldengate.desktop.ui.LocalDesktop
+import io.github.goldengate.desktop.ui.PushButton
 import io.github.goldengate.desktop.ui.desktopGestures
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -73,6 +76,11 @@ fun LockScreen(modifier: Modifier = Modifier) {
     var entry by remember { mutableStateOf("") }
     var wrong by remember { mutableStateOf(false) }
     val requiresPin = s.lockPin.isNotEmpty()
+    // An account exists but no passcode yet (e.g. the account was created before launch-locking).
+    val needsPasscode = s.accountCreated && !requiresPin
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var setupError by remember { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
     val shake = remember { Animatable(0f) }
     val avatar = LocalAccount.gradient(s.accountAvatar)
@@ -102,7 +110,9 @@ fun LockScreen(modifier: Modifier = Modifier) {
         desk.play(UiSound.Open)
         wrong = false
         entry = ""
+        setupError = null
         desk.overlay = Overlay.None
+        desk.bridge?.onUnlocked()
     }
 
     fun append(digit: Char) {
@@ -140,7 +150,7 @@ fun LockScreen(modifier: Modifier = Modifier) {
                     else -> null
                 }
                 when {
-                    !requiresPin && (e.key == Key.Enter || e.key == Key.Spacebar || e.key == Key.Escape) -> { unlock(); true }
+                    !requiresPin && !needsPasscode && (e.key == Key.Enter || e.key == Key.Spacebar || e.key == Key.Escape) -> { unlock(); true }
                     digit != null && requiresPin -> { append(digit); true }
                     e.key == Key.Backspace && requiresPin -> { entry = entry.dropLast(1); true }
                     e.key == Key.Enter && requiresPin -> {
@@ -240,6 +250,47 @@ fun LockScreen(modifier: Modifier = Modifier) {
                             KeypadKey("0") { append('0') }
                             KeypadKey("", glyph = Glyph.Close) { entry = entry.dropLast(1) }
                         }
+                    }
+                }
+            } else if (needsPasscode) {
+                Spacer(Modifier.height(8.dp))
+                GlassSurface(
+                    Modifier.widthIn(max = 300.dp).testTag("lock-passcode-setup"),
+                    cornerRadius = 20.dp, material = GlassMaterial.Menu, elevation = 18.dp,
+                ) {
+                    Column(
+                        Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DeskText("Protect your desktop", Desk.type.bodyStrong, color = Color.White)
+                        DeskText(
+                            "Choose a 4–8 digit passcode for ${s.accountName.ifBlank { s.userName }}.",
+                            Desk.type.small, color = Color.White.copy(alpha = 0.7f),
+                        )
+                        DeskTextField(
+                            newPin, { newPin = it.filter(Char::isDigit).take(8) },
+                            Modifier.fillMaxWidth().testTag("passcode-new"),
+                            placeholder = "Passcode", glyph = Glyph.Lock, password = true,
+                        )
+                        DeskTextField(
+                            confirmPin, { confirmPin = it.filter(Char::isDigit).take(8) },
+                            Modifier.fillMaxWidth().testTag("passcode-confirm"),
+                            placeholder = "Confirm passcode", glyph = Glyph.Lock, password = true,
+                        )
+                        setupError?.let {
+                            DeskText(it, Desk.type.small, color = Color(0xFFFFB4AB))
+                        }
+                        PushButton("Set Passcode", {
+                            when {
+                                newPin.length !in 4..8 -> setupError = "Use 4–8 digits."
+                                newPin != confirmPin -> setupError = "The passcodes don't match."
+                                else -> {
+                                    desk.updateSettings { it.copy(lockPin = newPin) }
+                                    unlock()
+                                }
+                            }
+                        }, primary = true)
                     }
                 }
             } else {

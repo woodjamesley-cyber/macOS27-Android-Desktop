@@ -43,6 +43,8 @@ interface PlatformBridge {
     fun requestBluetoothPermission(onResult: (Boolean) -> Unit)
     fun quitApp()
     fun toastFallback(text: String)
+    /** Called after the lock screen is dismissed, so deferred work (e.g. opening a just-installed app) can run. */
+    fun onUnlocked() {}
 
     // ---------------- App Store & Home app ----------------
     /** Picks an .apk file (the store copies it into its private library before installing). */

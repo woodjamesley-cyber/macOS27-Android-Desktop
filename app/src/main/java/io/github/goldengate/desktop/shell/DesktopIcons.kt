@@ -32,12 +32,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.goldengate.desktop.core.AppIds
+import io.github.goldengate.desktop.core.AppRegistry
 import io.github.goldengate.desktop.core.DesktopController
 import io.github.goldengate.desktop.core.DialogSpec
 import io.github.goldengate.desktop.core.entries
 import io.github.goldengate.desktop.fs.FsEntry
 import io.github.goldengate.desktop.fs.FsRef
 import io.github.goldengate.desktop.glass.Desk
+import io.github.goldengate.desktop.ui.AppIcon
 import io.github.goldengate.desktop.ui.DeskText
 import io.github.goldengate.desktop.ui.FileIcon
 import io.github.goldengate.desktop.ui.Glyph
@@ -74,7 +76,13 @@ fun DesktopSurface(modifier: Modifier = Modifier) {
             val col = i / rows; val row = i % rows
             return Offset(maxWidth.value - 12f - CELL_W * (col + 1), area.y + 8f + row * CELL_H)
         }
-        val positions = entries.mapIndexed { i, e -> e.ref.key to (desk.iconPositions[e.ref.key] ?: slot(i)) }.toMap()
+        val appShortcuts = desk.settings.desktopApps.filter { AppRegistry.get(it) != null }
+        val positions = LinkedHashMap<String, Offset>()
+        entries.forEachIndexed { i, e -> positions[e.ref.key] = desk.iconPositions[e.ref.key] ?: slot(i) }
+        appShortcuts.forEachIndexed { i, id ->
+            val key = deskAppKey(id)
+            positions[key] = desk.iconPositions[key] ?: slot(entries.size + i)
+        }
 
         // Background: clear selection, rubber band selection, context menu.
         Box(
@@ -95,6 +103,7 @@ fun DesktopSurface(modifier: Modifier = Modifier) {
                 .testTag("desktop"),
         )
         if (desk.settings.showDesktopIcons) {
+            appShortcuts.forEach { id -> DesktopAppIcon(desk, id, positions[deskAppKey(id)]!!) }
             entries.forEach { e -> DesktopIcon(desk, e, positions[e.ref.key]!!, entries, positions) }
         }
         band?.let { r ->
@@ -195,6 +204,61 @@ private fun DesktopIcon(desk: DesktopController, e: FsEntry, pos: Offset, all: L
             color = Color.White, maxLines = 2,
             modifier = Modifier.padding(top = 2.dp).clip(RoundedCornerShape(4.dp))
                 .background(if (selected) Desk.colors.accent else Color.Transparent).padding(horizontal = 4.dp, vertical = 1.dp),
+        )
+    }
+}
+
+private fun deskAppKey(appId: String) = "desktop-app:$appId"
+
+/** An app shortcut on the wallpaper (the App Store by default): double-click to open, drag to move. */
+@Composable
+private fun DesktopAppIcon(desk: DesktopController, appId: String, pos: Offset) {
+    val density = LocalDensity.current
+    var drag by remember { mutableStateOf(Offset.Zero) }
+    var dragging by remember { mutableStateOf(false) }
+    val iconSize = desk.settings.desktopIconSize.dp
+    Column(
+        Modifier
+            .offset { IntOffset(((pos.x + drag.x) * density.density).roundToInt(), ((pos.y + drag.y) * density.density).roundToInt()) }
+            .width(CELL_W.dp)
+            .graphicsLayer { if (dragging) alpha = 0.8f }
+            .iconDrag(
+                key = pos,
+                onStart = { dragging = true },
+                onDrag = { d -> drag += Offset(d.x / density.density, d.y / density.density) },
+                onEnd = {
+                    dragging = false
+                    if (abs(drag.x) + abs(drag.y) > 2f) {
+                        val nx = ((pos.x + drag.x) / 8f).roundToInt() * 8f
+                        val ny = ((pos.y + drag.y) / 8f).roundToInt() * 8f
+                        desk.iconPositions[deskAppKey(appId)] = Offset(nx, ny.coerceAtLeast(desk.wm.area.y))
+                        desk.saveIconPositions()
+                    }
+                    drag = Offset.Zero
+                },
+            )
+            .desktopGestures(
+                key = deskAppKey(appId),
+                onTap = { desk.wm.focus(null) },
+                onDoubleTap = { desk.launch(appId) },
+                onSecondary = { p ->
+                    desk.showContextMenu(p, entries {
+                        item("Open") { desk.launch(appId) }
+                        item("Remove from Desktop", glyph = Glyph.Trash) {
+                            desk.updateSettings { s -> s.copy(desktopApps = s.desktopApps - appId) }
+                        }
+                    })
+                },
+            )
+            .padding(top = 4.dp)
+            .testTag("desktop-app-$appId"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AppIcon(appId, iconSize)
+        DeskText(
+            AppRegistry.name(appId), Desk.type.caption.copy(textAlign = TextAlign.Center, shadow = labelShadow),
+            color = Color.White, maxLines = 2,
+            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }
